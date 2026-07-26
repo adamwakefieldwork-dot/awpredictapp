@@ -1,0 +1,151 @@
+body {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Yu Gothic UI', 'Yu Gothic', Helvetica, Arial, sans-serif;
+    text-align: center;
+}
+
+/* REMOVED scrollbar-gutter: stable — no longer needed. That was a
+   workaround for when the header scrolled with the page. Now that the
+   header is taken out of the scrolling flow entirely (see .content
+   below), there's nothing for a scrollbar to shift, so this rule
+   would only add an unwanted permanent gap for no benefit. */
+
+/* =========================================================
+   HEADER
+   Flexbox is the right tool here because everything sits in
+   a single horizontal row and we want space distributed
+   between the logo, nav links, and league box.
+   ========================================================= */
+.site-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between; /* pushes logo left, league box right,
+                                        nav sits in the middle gap */
+    padding: 16px 24px;
+    border-bottom: 2px solid #666;
+    flex-shrink: 0;
+
+    /* Needed so the dropdown nav (below) has something to position itself
+       relative to, once it's absolutely positioned on narrow screens. */
+    position: relative;
+
+}
+
+.logo-box,
+.league-box {
+    background-color: #e08a3e; /* orange, matches your mockup */
+    color: white;
+    font-weight: bold;
+    padding: 14px 20px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.main-nav {
+    display: flex;
+    gap: 32px; /* even spacing between nav links, no manual margins needed */
+}
+
+.nav-link {
+    text-decoration: none;
+    color: #222;
+    font-size: 1.1rem;
+}
+
+.nav-link.active-tab {
+    font-weight: bold;
+    /* Underline effect for whichever tab is "current" */
+    border-bottom: 2px solid #1b4b66;
+    padding-bottom: 4px;
+}
+
+/* Hamburger button — hidden by default. Only shown on narrow screens
+   via the media query below. */
+.nav-toggle {
+    display: none;
+    background: none;
+    border: none;
+    font-size: 1.8rem;
+    cursor: pointer;
+    color: #1b4b66;
+}
+
+/* =========================================================
+   NARROW SCREEN LAYOUT
+   Everything in here only applies when the viewport is 700px
+   wide or less — adjust this number to whatever breakpoint
+   actually matches where your header starts looking cramped.
+   ========================================================= */
+@media (max-width: 700px) {
+
+    /* Show the hamburger button now that we need it */
+    .nav-toggle {
+        display: block;
+    }
+
+    /* Hide the nav links by default on narrow screens... */
+    .main-nav {
+        display: none;
+
+        /* ...and when shown (via JS adding .nav-open below), position
+           it as a dropdown panel hanging below the header, rather than
+           squeezed into the same row as everything else. */
+        position: absolute;
+        top: 100%;      /* right below the header */
+        left: 0;
+        right: 0;
+        background-color: white;
+        flex-direction: column;   /* stack links vertically in the dropdown */
+        gap: 0;
+        border-bottom: 2px solid #1b4b66;
+        z-index: 50;
+    }
+
+    /* JS toggles this class on/off — this is what actually reveals
+       the dropdown when the hamburger is clicked */
+    .main-nav.nav-open {
+        display: flex;
+    }
+
+    .nav-link {
+        padding: 14px 24px;
+        border-bottom: 1px solid #eee;
+    }
+
+    /* Shrink the orange boxes a bit so they don't dominate a narrow screen */
+    .logo-box,
+    .league-box {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+    }
+}
+
+/* =========================================================
+   SCROLLABLE CONTENT REGION
+   Everything except the header lives inside a <div class="content">
+   wrapper in the HTML. Taking it out of normal page flow with
+   position: fixed and giving IT the scrollbar (not the whole page)
+   means the header, which sits outside this box, can never be
+   affected by scrolling at all.
+   ========================================================= */
+.content {
+    position: fixed;
+
+    /* top must match your header's actual rendered height exactly,
+       or you'll either see a gap between header and content, or the
+       content will start underneath the header and be hidden by it.
+       80px is a guess — check your real header height in dev tools
+       (right-click header → Inspect → look at the box size shown)
+       and adjust this to match precisely. */
+    top: 80px;
+
+    left: 0;
+    right: 0;
+    bottom: 0;
+
+    overflow-y: auto; /* scrollbar only ever applies to this box,
+                          starting visually right below the header */
+    padding: 20px;
+}

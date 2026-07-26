@@ -1,0 +1,22 @@
+# Dependencies — huge, and regenerated from package.json via `npm install`.
+# Never commit this; it doesn't belong in version history.
+node_modules/
+
+# Your actual database files — these are DATA, not code. They change
+# constantly and contain real user info (password hashes, emails).
+# Definitely don't want this in git, and especially not pushed anywhere public.
+db/data/*.db
+db/data/*.db-shm
+db/data/*.db-wal
+
+# Secrets — SESSION_SECRET and anything else sensitive lives here.
+# This file must NEVER be committed. A .env.example (with placeholder
+# values only) is fine to commit as a template for what's expected.
+.env
+
+# Logs, if you ever redirect any output to files
+*.log
+
+# OS/editor junk files that sometimes sneak in
+.DS_Store
+Thumbs.db

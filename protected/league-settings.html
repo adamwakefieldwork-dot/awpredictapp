@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Scores</title>
+    <!-- Leading slash = absolute path, so this resolves correctly no
+         matter what URL this page is actually served at (e.g. /app/your-scores.html) -->
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/league-settings.css">
+</head>
+<body>
+<!-- ===================== HEADER / NAV =====================
+     This is just static markup — same on every page once you build
+     the other three tabs. No JS needed here, it never changes. -->
+<header class="site-header">
+    <div class="logo-box">Logo not drawn</div>
+
+    <!-- Add a hamburger button to hide the menu-->
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle menu">&#9776;</button>
+
+    <nav id="main-nav" class="main-nav">
+        <!-- "active-tab" class just gives this one a bold/underlined style
+             via CSS — you'll add/remove this class per page. -->
+        <a href="/app/your-scores.html" class="nav-link">Your Scores</a>
+        <a href="/app/all-scores.html" class="nav-link">All Scores</a>
+        <a href="/app/dashboard.html" class="nav-link">Dashboard</a>
+        <a href="/app/user-settings.html" class="nav-link">User Settings</a>
+        <a href="/app/league-settings.html" class="nav-link active-tab">League Settings</a>
+    </nav>
+
+    <!-- Placeholder for now — wiring up real league switching is a
+         separate feature (see note in the chat). -->
+    <div class="league-box">Drop down box to pick league</div>
+</header>
+
+<div class="content">
+
+<script src="/site-header.js"></script>
+
+</body>
+

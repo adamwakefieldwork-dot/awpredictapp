@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your Scores</title>
+    <!-- Leading slash = absolute path, so this resolves correctly no
+         matter what URL this page is actually served at (e.g. /app/your-scores.html) -->
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/your-scores.css">
+</head>
+<body>
+
+<!-- ===================== HEADER / NAV =====================
+     This is just static markup — same on every page once you build
+     the other three tabs. No JS needed here, it never changes. -->
+<header class="site-header">
+    <div class="logo-box">Logo not drawn</div>
+
+    <!-- Add a hamburger button to hide the menu-->
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle menu">&#9776;</button>
+
+    <nav id="main-nav" class="main-nav">
+        <!-- "active-tab" class just gives this one a bold/underlined style
+             via CSS — you'll add/remove this class per page. -->
+        <a href="/app/your-scores.html" class="nav-link active-tab">Your Scores</a>
+        <a href="/app/all-scores.html" class="nav-link">All Scores</a>
+        <a href="/app/dashboard.html" class="nav-link">Dashboard</a>
+        <a href="/app/user-settings.html" class="nav-link">User Settings</a>
+        <a href="/app/league-settings.html" class="nav-link">League Settings</a>
+    </nav>
+
+    <!-- Placeholder for now — wiring up real league switching is a
+         separate feature (see note in the chat). -->
+    <div class="league-box">Drop down box to pick league</div>
+</header>
+
+<div class="content">
+
+    <!-- ===================== GAMEWEEK NAVIGATOR =====================
+        The arrows are buttons, not links — clicking them runs JS that
+        changes which gameweek's fixtures we're looking at, without
+        reloading the page. -->
+    <div class="gameweek-nav">
+        <button id="prev-gameweek" class="gameweek-arrow" aria-label="Previous gameweek">&#9664;</button>
+        <span id="gameweek-label" class="gameweek-label">Game Week</span>
+        <button id="next-gameweek" class="gameweek-arrow" aria-label="Next gameweek">&#9654;</button>
+    </div>
+
+    <!-- ===================== FIXTURES BOX =====================
+        This div starts EMPTY. JS fills #fixtures-list with one row per
+        game, every time the gameweek changes. We never hand-write fixture
+        rows in HTML, because the data (teams, scores, status) is dynamic
+        and lives in the database, not in this file. -->
+    <div class="fixtures-box">
+        <div id="fixtures-list">
+            <!-- rows get inserted here by JS -->
+            <p class="loading-msg">Loading fixtures...</p>
+        </div>
+    </div>
+
+    <!-- Shows save success/failure feedback -->
+    <p id="save-message" class="save-message"></p>
+
+    <button id="save-button" class="btn-save">Save Predictions</button>
+</div>
+<script src="/site-header.js"></script>
+<script src="/your-scores.js"></script>
+
+</body>
+</html>

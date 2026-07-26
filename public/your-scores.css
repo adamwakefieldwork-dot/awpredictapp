@@ -1,0 +1,182 @@
+
+
+/* =========================================================
+   GAMEWEEK NAVIGATOR
+   Also flexbox — three items in a row (arrow, label, arrow),
+   centered as a group in the middle of the page.
+   ========================================================= */
+.gameweek-nav {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    margin: 28px 0;
+}
+
+.gameweek-label {
+    font-size: 1.2rem;
+    min-width: 140px;
+    text-align: center;
+}
+
+.gameweek-arrow {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 1.4rem;
+    color: #4D8064;
+    /* Slightly larger clickable area than the visible triangle,
+       makes it easier to tap on mobile */
+    padding: 6px 12px;
+}
+
+.gameweek-arrow:disabled {
+    color: #ccc; /* greyed out when we're at the earliest/latest gameweek */
+    cursor: not-allowed;
+}
+
+/* =========================================================
+   FIXTURES BOX
+   The big rounded rectangle containing every fixture row.
+   ========================================================= */
+.fixtures-box {
+    border: 2px solid white;
+    border-radius: 24px;
+    max-width: 800px;
+    margin: 0 auto 24px auto; /* centers the box horizontally on the page */
+    padding: 32px 40px;
+}
+
+/* =========================================================
+   INDIVIDUAL FIXTURE ROW
+   This is the key layout piece. CSS Grid (not Flexbox) because
+   we want fixed-width, PREDICTABLE columns that line up exactly
+   the same way on every row, regardless of how long team names are.
+
+   Columns, left to right:
+     1. home team name   (flexible width, text right-aligned toward center)
+     2. home score input  (fixed width)
+     3. dash "-"           (fixed width, small)
+     4. away score input  (fixed width)
+     5. away team name    (flexible width, text left-aligned toward center)
+   ========================================================= */
+/* NEW — wraps the date + the fixture-row grid together as one unit,
+   so each fixture (date + teams + scores) forms a visually distinct
+   block, with its own bottom border separating it from the next one. */
+.fixture-block {
+    padding: 14px 0;
+}
+
+.fixture-block:not(:last-child) {
+    border-bottom: 1px solid #eee;
+}
+
+/* NEW — simple styling for the date line sitting above each fixture */
+.date-label {
+    font-size: 0.85rem;
+    color: #666;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+/* .fixture-row stays exactly as it was — no changes needed here,
+   since it's back to holding exactly 5 items again */
+.fixture-row {
+    display: grid;
+    grid-template-columns: 1fr 70px 24px 70px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 0;
+}
+
+.home-team-name {
+    text-align: right; /* names lean in toward the score boxes,
+                            matching your mockup's layout */
+}
+
+.away-team-name {
+    text-align: left;
+    padding-left: 4px
+}
+
+.score-dash {
+    text-align: center;
+    font-weight: bold;
+}
+
+/* The actual number input boxes */
+.score-input {
+    width: 100%;
+    height: 40px;
+    text-align: center;
+    font-size: 1.1rem;
+    border: 2px solid white;
+    border-radius: 4px;
+    background-color: #4D8064; /* dark blue fill, matches mockup */
+    color: white;
+}
+
+/* When a game's status isn't "Not Played", JS adds the `disabled`
+   attribute to the input — this styles that state so it's visually
+   obvious the box can't be edited anymore. */
+.score-input:disabled {
+    background-color: #b0b0b0;
+    border-color: #888;
+    color: #eee;
+    cursor: not-allowed;
+}
+
+
+/* Chrome, Safari, Edge (all WebKit/Blink-based) use these
+   pseudo-elements to render the spinner arrows */
+.score-input::-webkit-outer-spin-button,
+.score-input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+/* Firefox uses a completely different mechanism — a value on the
+   input's own "appearance" property, not a pseudo-element */
+.score-input[type="number"] {
+    -moz-appearance: textfield;
+}
+
+
+.loading-msg {
+    text-align: center;
+    color: #666;
+}
+
+/* =========================================================
+   SAVE BUTTON + FEEDBACK MESSAGE
+   ========================================================= */
+.btn-save {
+    display: block;
+    margin: 0 auto 40px auto;
+    padding: 12px 32px;
+    font-size: 1.1rem;
+    background-color: #1b4b66;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn-save:hover {
+    background-color: #123a50;
+}
+
+.save-message {
+    text-align: center;
+    font-weight: bold;
+    min-height: 1.5em; /* reserves space so layout doesn't jump when
+                           the message appears/disappears */
+}
+
+.save-message.success {
+    color: green;
+}
+
+.save-message.error {
+    color: red;
+}

@@ -1,0 +1,100 @@
+.signin-container {
+    min-height: 100vh;        /* full screen height */
+    display: flex;
+    justify-content: center;   /* center horizontally */
+    align-items: center;       /* center vertically */
+    background: linear-gradient(135deg, #0b5c1f 0%, #1a8a3d 100%);
+    font-family: 'Segoe UI', Arial, sans-serif;
+}
+.signin-box {
+    background: #ffffff;
+    padding: 40px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+}
+.club-badge {
+    font-size: 48px;
+    margin-bottom: 10px;
+}
+
+.signin-box h1 {
+    color: #0b5c1f;
+    margin-bottom: 5px;
+    font-size: 26px;
+}
+
+.subtitle {
+    color: #777;
+    margin-bottom: 25px;
+    font-size: 14px;
+}
+.form-group {
+    text-align: left;
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 6px;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 12px;
+    border: 2px solid #ddd;
+    border-radius: 6px;
+    font-size: 14px;
+    box-sizing: border-box;   /* padding won't overflow the width */
+    transition: border-color 0.2s;
+}
+
+.form-group input:focus {
+    outline: none;
+    border-color: #1a8a3d;   /* green highlight on click */
+}
+.btn-signin {
+    width: 100%;
+    padding: 13px;
+    background: #0b5c1f;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-signin:hover {
+    background: #1a8a3d;
+}
+.signup-link {
+    margin-top: 20px;
+    font-size: 13px;
+    color: #666;
+}
+
+.signup-link a {
+    color: #0b5c1f;
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.signup-link a:hover {
+    text-decoration: underline;
+}
+.form-error {
+    background: #fdecea;
+    color: #b3261e;
+    border: 1px solid #f5c6cb;
+    border-radius: 6px;
+    padding: 10px 14px;
+    margin-bottom: 16px;
+    font-size: 0.9rem;
+}
