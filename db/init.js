@@ -55,6 +55,17 @@ db.exec(`
 `);
 
 db.exec(`
+  CREATE TABLE IF NOT EXISTS leagueuser (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    leaguesid INTEGER ,
+    userid INTEGER ,
+    owner TEXT ,
+    FOREIGN KEY (userid) REFERENCES users(id),
+    FOREIGN KEY (leaguesid) REFERENCES leagues(id)
+  )
+`);
+
+db.exec(`
   CREATE TABLE IF NOT EXISTS rounds (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,

@@ -139,6 +139,40 @@ app.post('/api/signout', (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// LEAGUE HEADER API — powers the "League Settings" page
+// ---------------------------------------------------------------------------
+
+app.get('/api/leagues', requireLoginApi, (req, res) => {
+  const userId = req.session.userId;
+
+  //Prepare the sql to get
+  const userLeagues = db.prepare(`
+    SELECT 
+    leagues.id, 
+    leagues.name 
+    FROM leagues 
+    JOIN leagueuser on leagues.id = leagueuser.leaguesid
+    join users on users.id = leagueuser.userid
+    where users.id = ?
+    order by leagues.id
+    `).all(userId)
+    
+  if (userLeagues.length  === 0)
+  { //If they are in no leagues
+    return res.json({ leagues: userLeagues });
+  }
+
+  if (!req.session.currentleague) {
+      //checks current sessions and if it already exists
+      //stops overriding
+      req.session.currentleague = userLeagues[0].id;
+  }
+
+  res.json({ leagues: userLeagues });
+
+});
+
+// ---------------------------------------------------------------------------
 // SCORES API — powers the "Your Scores" page
 // ---------------------------------------------------------------------------
  
@@ -211,10 +245,11 @@ app.get('/api/scores', requireLoginApi, (req, res) => {
     games: gamesWithPredictions
   });
 });
- 
+
 // POST /api/scores — save (insert or update) a batch of predictions
 app.post('/api/scores', requireLoginApi, (req, res) => {
   const userId = req.session.userId;
+  const currentleague = req.session.currentleague
   const { predictions } = req.body;
  
   if (!Array.isArray(predictions) || predictions.length === 0) {
@@ -253,12 +288,12 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
         throw new Error(`Game ${p.gameId} is no longer editable`);
       }
  
-      const existing = findExisting.get(userId, p.gameId, DEFAULT_LEAGUE_ID);
+      const existing = findExisting.get(userId, p.gameId, currentleague);
  
       if (existing) {
         updateScore.run(p.hometeamscore, p.awayteamscore, existing.id);
       } else {
-        insertScore.run(userId, DEFAULT_LEAGUE_ID, p.gameId, p.hometeamscore, p.awayteamscore);
+        insertScore.run(userId, currentleague, p.gameId, p.hometeamscore, p.awayteamscore);
       }
     }
   });
@@ -270,6 +305,34 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
     console.error(err);
     res.status(400).json({ error: err.message });
   }
+});
+
+// ---------------------------------------------------------------------------
+// LEAGUE SETTINGS API — powers the "League Settings" page
+// ---------------------------------------------------------------------------
+
+app.get('/api/leaguesettings', requireLoginApi, (req, res) => {
+  const userId = req.session.userId;
+
+  //Prep the sessions
+  const games = db.prepare(`
+    select 
+      name ,
+      joinid,
+      wildcardonoff,
+      winscore ,
+      perfectscore ,
+      losescore ,
+      wildcardwinscore ,
+      wildcardlosescore ,
+      hidetime
+    from leagues
+    join leagueowner on leagues.id = leagueowner.leaguesid
+    join users on users.id = leagueowner.userid
+    where users.id = ?
+    and leaguesid = ?
+  `).all(gameweek);
+
 });
 
 // :page captures whatever comes after /app/ in the URL — e.g.

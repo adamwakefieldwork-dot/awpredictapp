@@ -149,3 +149,49 @@ body {
                           starting visually right below the header */
     padding: 20px;
 }
+
+.league-dropdown {
+    /* Match the same look as .logo-box / .league-box */
+    background-color: #e08a3e;
+    color: white;
+    font-weight: bold;
+    padding: 14px 20px;
+    border-radius: 10px;
+    text-align: center;
+
+    /* Dropdowns are notoriously hard to style consistently across
+       browsers, because each browser draws its own default arrow/border.
+       appearance: none strips ALL of that default styling away, giving
+       us a blank canvas to style exactly like everything else. */
+    appearance: none;
+    -webkit-appearance: none;   /* Safari/older Chrome still need the prefix */
+    -moz-appearance: none;      /* Firefox */
+
+    border: none;
+    cursor: pointer;
+    font-size: 1rem;
+
+    /* Since appearance: none removes the browser's built-in dropdown
+       arrow entirely, we draw our own using a small inline SVG as a
+       background image — positioned on the right side of the box. */
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='white'><path d='M5 7l5 5 5-5z'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 14px;
+
+    /* Extra right padding so the text doesn't sit underneath the arrow */
+    padding-right: 40px;
+}
+
+/* Optional: slightly different look on hover, for feedback that it's clickable */
+.league-dropdown:hover {
+    background-color: #d67a2e;
+}
+
+/* The dropdown's OPEN panel (the list of options) — browsers give you
+   very limited styling control here, this is mostly cosmetic and may
+   not apply identically in every browser. */
+.league-dropdown option {
+    background-color: white;
+    color: #222;
+}
