@@ -108,11 +108,13 @@ db.exec(`
     awayteamscore INTEGER,
     wildcardused TEXT,
     leaguescore INTEGER ,
+    leaguepoint INTEGER ,
     FOREIGN KEY (userid) REFERENCES users(id),
     FOREIGN KEY (gameid) REFERENCES games(id),
     FOREIGN KEY (leagueid) REFERENCES leagues(id)
   )
 `);
+
 
 console.log('database opened successfully');
 

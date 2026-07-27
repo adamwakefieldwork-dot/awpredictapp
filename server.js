@@ -313,6 +313,7 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
 
 app.get('/api/leaguesettings', requireLoginApi, (req, res) => {
   const userId = req.session.userId;
+  const currentleague = req.session.currentleague;
 
   //Prep the sessions
   const games = db.prepare(`
@@ -331,7 +332,7 @@ app.get('/api/leaguesettings', requireLoginApi, (req, res) => {
     join users on users.id = leagueowner.userid
     where users.id = ?
     and leaguesid = ?
-  `).all(gameweek);
+  `).all(userId , currentleague);
 
 });
 

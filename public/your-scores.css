@@ -96,12 +96,13 @@
 
 .away-team-name {
     text-align: left;
-    padding-left: 4px
+    padding-left: 4px;
 }
 
 .score-dash {
     text-align: center;
     font-weight: bold;
+    padding-left: 10px;
 }
 
 /* The actual number input boxes */
