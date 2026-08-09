@@ -1,0 +1,85 @@
+.join-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+.join-box {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    padding: 40px;
+    width: 100%;
+    max-width: 380px;
+    text-align: center;
+}
+
+.join-box h1 {
+    margin: 0 0 8px 0;
+    color: #1b4b66;
+}
+
+.join-box .subtitle {
+    color: #666;
+    margin-bottom: 24px;
+    font-size: 0.95rem;
+}
+
+.form-group {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 6px;
+    color: #1b4b66;
+}
+
+.form-group input {
+    width: 100%;
+    height: 40px;
+    padding: 0 12px;
+    border: 2px solid #1b4b66;
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+.error-message {
+    color: red;
+    font-weight: bold;
+    min-height: 1.2em;
+    margin: 0 0 12px 0;
+}
+
+.btn-join {
+    width: 100%;
+    padding: 12px;
+    background-color: #1b4b66;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    cursor: pointer;
+}
+
+.btn-join:hover {
+    background-color: #123a50;
+}
+
+.signout-link {
+    margin-top: 20px;
+    font-size: 0.9rem;
+}
+
+.signout-link a {
+    color: #666;
+    text-decoration: none;
+}
+
+.signout-link a:hover {
+    text-decoration: underline;
+}

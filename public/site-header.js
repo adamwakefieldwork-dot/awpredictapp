@@ -1,18 +1,14 @@
-// Handles the hamburger menu toggle for the site header. Shared across
-// every page that uses this header, so it lives in its own small file
-// rather than being duplicated inside your-scores.js, dashboard.js, etc.
+// Handles the hamburger menu toggle AND the league dropdown for the
+// site header. Shared across every page that uses this header.
 
 const navToggle = document.getElementById('nav-toggle');
 const mainNav = document.getElementById('main-nav');
 
 navToggle.addEventListener('click', () => {
-    // Adds the class if it's missing, removes it if present —
-    // classList.toggle() does exactly that in one line.
     mainNav.classList.toggle('nav-open');
 });
 
-// --- LEAGUE DROPDOWN ---
-// Fetches the logged-in user's leagues and fills the dropdown with them.
+// --- LEAGUE DROPDOWN + OWNERSHIP-BASED NAV VISIBILITY ---
 
 async function loadLeagues() {
     const dropdown = document.getElementById('league-dropdown');
@@ -31,17 +27,24 @@ async function loadLeagues() {
             return;
         }
 
-        // Build one <option> per league, using the SAME html += pattern
-        // you already used in renderFixtures().
         let optionsHtml = '';
         for (const league of data.leagues) {
-            optionsHtml += `<option value="${league.id}">${league.name}</option>`;
+            const isSelected = league.id === data.currentleague ? 'selected' : '';
+            optionsHtml += `<option value="${league.id}" ${isSelected}>${league.name}</option>`;
         }
-
         dropdown.innerHTML = optionsHtml;
 
+        // Only show "League Settings" in the nav if the CURRENTLY
+        // selected league is one this user owns. Every page that
+        // includes this header should give its League Settings link
+        // this id for the hide/show to work.
+        const settingsLink = document.getElementById('league-settings-link');
+        if (settingsLink) {
+            const current = data.leagues.find((l) => l.id === data.currentleague);
+            settingsLink.style.display = (current && current.owner === 'yes') ? '' : 'none';
+        }
+
     } catch (err) {
-        console.error('League fetch failed:', err);
         dropdown.innerHTML = '<option>Network error</option>';
     }
 }

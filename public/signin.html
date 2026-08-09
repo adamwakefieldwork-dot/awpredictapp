@@ -10,16 +10,12 @@
 <div class="signin-container">
     <div class="signin-box">
         <h1>Welcome Back</h1>
-        <p id="success-message" style="color: green; display: none;"></p>
         <p class="subtitle">Sign in to set and see your predictions</p>
 
-        <!-- action="#" is left as a fallback but is never actually used,
-             because our <script> below calls e.preventDefault() and
-             takes over the submit behaviour with fetch() instead. -->
         <form action="#" method="POST">
             <div class="form-group">
-                <label for="username">Username</label>
-                <input type="text" id="username" name="username" placeholder="Enter your username" required>
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="Enter your email" required>
             </div>
 
             <div class="form-group">
@@ -27,8 +23,6 @@
                 <input type="password" id="password" name="password" placeholder="Enter your password" required>
             </div>
 
-            <!-- Error messages from the server get written in here.
-                 Hidden by default; JS below shows it only when needed. -->
             <p id="error-message" style="color: red; display: none;"></p>
 
             <button type="submit" class="btn-signin">Sign In</button>
@@ -39,67 +33,34 @@
 </div>
 
 <script>
-  // This whole <script> block runs in the USER'S BROWSER, not on the server.
-  // It has no access to the database, server.js, or anything on the Pi's
-  // filesystem — its only job is to package what the user typed and send
-  // it to the server over HTTP, then react to whatever comes back.
-
-  // URLSearchParams is a built-in browser API for reading query
-  // parameters out of the current URL without manual string splitting.
-  const params = new URLSearchParams(window.location.search);
-
-  if (params.get('signup') === 'success') {
-    const successEl = document.getElementById('success-message');
-    successEl.textContent = 'Account created — please log in';
-    successEl.style.display = 'block';
-  }
   document.querySelector('form').addEventListener('submit', async (e) => {
-    // Stop the browser's default form behaviour (which would normally
-    // navigate to action="#" and reload the page). Without this line,
-    // none of the code below would ever get a chance to run.
     e.preventDefault();
 
-    // Read the current values out of the input fields.
-    // These are just plain JS strings living in browser memory right now —
-    // nothing has been sent anywhere yet.
-    const username = document.getElementById('username').value;
+    // Reading from #email now instead of #username — matches the
+    // renamed field above, and the {email, password} shape the
+    // server's /api/signin route now expects.
+    const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const errorEl = document.getElementById('error-message');
 
     try {
-      // fetch() is the ONE line that actually leaves the browser.
-      // It sends a real HTTP POST request to our own server, at the
-      // /api/signin route defined in server.js.
-      //
-      // JSON.stringify() converts our JS object into a text string,
-      // since HTTP can only carry text/bytes, not live JS objects.
       const res = await fetch('/api/signin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password })
+        body: JSON.stringify({ email, password })
       });
 
-      // res.json() parses the server's JSON response body back into
-      // a JS object we can read here in the browser.
       const data = await res.json();
 
-      // res.ok is true only for 2xx status codes. server.js sends 401
-      // on bad credentials, so this branch handles that case.
       if (!res.ok) {
         errorEl.textContent = data.error || 'Something went wrong';
         errorEl.style.display = 'block';
         return;
       }
 
-      // Nothing about this next line is "sent" by the server — the
-      // server only replied {"success": true}. The DECISION of where
-      // to send the browser next lives entirely here, in our own code.
-      // This is identical to the user typing this URL in manually.
-      window.location.href = 'app/your-scores.html';
+      window.location.href = '/app/your-scores.html';
 
     } catch (err) {
-      // This catches network failures (server down, no wifi, etc.),
-      // not login failures — those are handled by the !res.ok check above.
       errorEl.textContent = 'Network error — try again';
       errorEl.style.display = 'block';
     }

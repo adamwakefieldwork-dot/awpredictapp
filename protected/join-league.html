@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Join a League</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/join-league.css">
+</head>
+<body>
+
+<!-- Deliberately NO header/nav here — the whole point of this page is
+     that someone with no league yet can't go anywhere else in the app,
+     so there's nothing for a nav bar to link to. -->
+<div class="join-container">
+    <div class="join-box">
+        <h1>Join a League</h1>
+        <p class="subtitle">Enter the join code your league organiser shared with you</p>
+
+        <form id="join-form">
+            <div class="form-group">
+                <label for="join-code">Join Code</label>
+                <input type="text" id="join-code" name="joinCode" placeholder="e.g. ABC123" required>
+            </div>
+
+            <p id="error-message" class="error-message"></p>
+
+            <button type="submit" class="btn-join">Join League</button>
+        </form>
+
+        <!-- Sign out is the only other action available from here —
+             useful if someone signed up without a code and wants to
+             stop, or realizes they used the wrong account. -->
+        <p class="signout-link"><a href="#" id="signout-link">Sign out</a></p>
+    </div>
+</div>
+
+<script src="/join-league.js"></script>
+
+</body>
+</html>

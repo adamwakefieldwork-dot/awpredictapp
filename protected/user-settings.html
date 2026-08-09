@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Settings</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/user-settings.css">
+</head>
+<body>
+
+<header class="site-header">
+    <div class="logo-box">Logo not drawn</div>
+
+    <button id="nav-toggle" class="nav-toggle" aria-label="Toggle menu">&#9776;</button>
+
+    <nav id="main-nav" class="main-nav">
+        <a href="/app/your-scores.html" class="nav-link">Your Scores</a>
+        <a href="/app/all-scores.html" class="nav-link">All Scores</a>
+        <a href="/app/dashboard.html" class="nav-link">Dashboard</a>
+        <a href="/app/user-settings.html" class="nav-link active-tab">User Settings</a>
+        <a href="/app/league-settings.html" id="league-settings-link" class="nav-link">League Settings</a>
+    </nav>
+
+    <select id="league-dropdown" class="league-dropdown">
+        <option>Loading leagues...</option>
+    </select>
+</header>
+
+<div class="content">
+
+    <!-- Two independent forms, each with its own Save button and
+         message — a mistake in one shouldn't block or clear the other. -->
+
+    <div class="settings-box">
+        <h2>Change Username</h2>
+
+        <div class="settings-row">
+            <label for="new-username">New Username</label>
+            <input type="text" id="new-username" placeholder="Enter new username">
+        </div>
+
+        <p id="username-message" class="save-message"></p>
+        <button id="username-save-button" class="btn-save">Save Username</button>
+    </div>
+
+    <div class="settings-box">
+        <h2>Change Password</h2>
+
+        <div class="settings-row">
+            <label for="current-password">Current Password</label>
+            <input type="password" id="current-password" placeholder="Enter current password">
+        </div>
+
+        <div class="settings-row">
+            <label for="new-password">New Password</label>
+            <input type="password" id="new-password" placeholder="Enter new password">
+        </div>
+
+        <div class="settings-row">
+            <label for="confirm-new-password">Confirm New Password</label>
+            <input type="password" id="confirm-new-password" placeholder="Re-enter new password">
+        </div>
+
+        <p id="password-message" class="save-message"></p>
+        <button id="password-save-button" class="btn-save">Save Password</button>
+    </div>
+
+</div>
+
+<script src="/site-header.js"></script>
+<script src="/user-settings.js"></script>
+
+</body>
+</html>

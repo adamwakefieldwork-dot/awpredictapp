@@ -1,0 +1,104 @@
+/* =========================================================
+   SETTINGS BOX
+   Same rounded-container idea as .fixtures-box on your-scores,
+   just holding a form instead of fixture rows.
+   ========================================================= */
+.settings-box {
+    border: 2px solid #4a6fa5;
+    border-radius: 24px;
+    max-width: 600px;
+    margin: 32px auto;
+    padding: 32px 40px;
+}
+
+/* =========================================================
+   FORM ROWS
+   Each setting is a label + input pair, stacked in a column.
+   Using Grid here (not Flexbox) because we want every label to
+   line up at the same width, so all the inputs start at the
+   same horizontal position regardless of label text length.
+   ========================================================= */
+.settings-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.settings-row {
+    display: grid;
+    grid-template-columns: 180px 1fr; /* fixed label width, input takes the rest */
+    align-items: center;
+    gap: 16px;
+}
+
+.settings-row label {
+    text-align: right;
+    font-weight: bold;
+    color: #1b4b66;
+}
+
+.settings-row input[type="text"],
+.settings-row input[type="number"],
+.settings-row input[type="time"] {
+    height: 38px;
+    padding: 0 10px;
+    border: 2px solid #1b4b66;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+/* joinID is shown but not editable — visually distinct so it's clear
+   this one behaves differently from the rest */
+.settings-row input[readonly] {
+    background-color: #eee;
+    color: #666;
+    cursor: not-allowed;
+}
+
+/* Wildcard on/off — a checkbox rather than a text/number box */
+.settings-row input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    justify-self: start;
+}
+
+.loading-msg {
+    text-align: center;
+    color: #666;
+}
+
+/* =========================================================
+   SAVE BUTTON + FEEDBACK MESSAGE
+   Reused styling from your-scores.css — keeping these visually
+   consistent across every page that has a "Save" action.
+   ========================================================= */
+.btn-save {
+    display: block;
+    margin: 24px auto 0 auto;
+    padding: 12px 32px;
+    font-size: 1.1rem;
+    background-color: #1b4b66;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.btn-save:hover {
+    background-color: #123a50;
+}
+
+.save-message {
+    text-align: center;
+    font-weight: bold;
+    min-height: 1.5em;
+    margin-top: 16px;
+}
+
+.save-message.success {
+    color: green;
+}
+
+.save-message.error {
+    color: red;
+}

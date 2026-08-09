@@ -50,7 +50,8 @@ db.exec(`
     losescore INTEGER ,
     wildcardwinscore INTEGER ,
     wildcardlosescore INTEGER ,
-    hidetime TEXT
+    hidetime TEXT ,
+    updatedatetime TEXT
   )
 `);
 
@@ -62,14 +63,6 @@ db.exec(`
     owner TEXT ,
     FOREIGN KEY (userid) REFERENCES users(id),
     FOREIGN KEY (leaguesid) REFERENCES leagues(id)
-  )
-`);
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS rounds (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    icon BLOB 
   )
 `);
 
@@ -92,7 +85,7 @@ db.exec(`
     hometeamscore INTEGER ,
     awayteamscore INTEGER ,
     status text ,
-    FOREIGN KEY (roundid) REFERENCES rounds(id),
+    updatedatetime text,
     FOREIGN KEY (hometeamid) REFERENCES teams(id),
     FOREIGN KEY (awayteamid) REFERENCES teams(id)
   )
@@ -108,7 +101,7 @@ db.exec(`
     awayteamscore INTEGER,
     wildcardused TEXT,
     leaguescore INTEGER ,
-    leaguepoint INTEGER ,
+    updatedatetime TEXT,
     FOREIGN KEY (userid) REFERENCES users(id),
     FOREIGN KEY (gameid) REFERENCES games(id),
     FOREIGN KEY (leagueid) REFERENCES leagues(id)
