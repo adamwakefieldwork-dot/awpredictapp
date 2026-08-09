@@ -126,6 +126,98 @@ app.post('/api/signout', (req, res) => {
   req.session.destroy(() => res.json({ success: true }));
 });
 
+const crypto = require('crypto');
+const { Resend } = require('resend');
+const resend = new Resend(process.env.RESEND_API_KEY);
+
+// POST /api/forgot-password — generates a one-time token, emails a reset
+// link. Always responds with the SAME generic message whether or not the
+// email exists, so this endpoint can't be used to check who has an account.
+app.post('/api/forgot-password', async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Email required' });
+  }
+
+  const user = db.prepare('SELECT id FROM users WHERE email = ?').get(email);
+
+  if (user) {
+    // The raw token goes in the emailed link — the DATABASE only ever
+    // stores a hash of it, same principle as password_hashed. If the
+    // database leaked, the stored hashes alone can't be used to reset
+    // anyone's password.
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+
+    // Token expires in 1 hour — stored as a plain millisecond timestamp,
+    // simplest thing to compare against Date.now() later.
+    const expiry = Date.now() + 60 * 60 * 1000;
+
+    db.prepare(`
+      UPDATE users SET resettoken = ?, resettokenexpiry = ? WHERE id = ?
+    `).run(hashedToken, String(expiry), user.id);
+
+    const resetLink = `https://www.awpredictions.uk/reset-password.html?token=${rawToken}`;
+
+    try {
+      await resend.emails.send({
+        from: 'AWPredictApp <admin@awpredictions.uk>',
+        to: email,
+        subject: 'Reset your password',
+        html: `
+          <p>Someone requested a password reset for your AWPredictApp account.</p>
+          <p><a href="${resetLink}">Click here to reset your password</a></p>
+          <p>This link expires in 1 hour. If you didn't request this, you can ignore this email.</p>
+        `
+      });
+    } catch (err) {
+      // Log it, but still respond with the generic success message below —
+      // we don't want a Resend outage to reveal whether the email exists.
+      console.error('Failed to send reset email:', err);
+    }
+  }
+
+  // Same response regardless of whether user was found above.
+  res.json({ message: 'If that email is registered, a reset link has been sent.' });
+});
+
+// POST /api/reset-password — verifies the token (hash + expiry match),
+// then sets a new password and clears the token so it can't be reused.
+app.post('/api/reset-password', async (req, res) => {
+  const { token, newPassword } = req.body;
+
+  if (!token || !newPassword) {
+    return res.status(400).json({ error: 'Missing fields' });
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+
+  const user = db.prepare(`
+    SELECT id, resettokenexpiry FROM users WHERE resettoken = ?
+  `).get(hashedToken);
+
+  if (!user) {
+    return res.status(400).json({ error: 'Invalid or expired reset link' });
+  }
+
+  if (Date.now() > Number(user.resettokenexpiry)) {
+    return res.status(400).json({ error: 'Invalid or expired reset link' });
+  }
+
+  const newHashed = await bcrypt.hash(newPassword, 10);
+
+  // Clearing resettoken/resettokenexpiry means this exact link can never
+  // be used a second time, even within its 1-hour window.
+  db.prepare(`
+    UPDATE users SET password_hashed = ?, resettoken = NULL, resettokenexpiry = NULL
+    WHERE id = ?
+  `).run(newHashed, user.id);
+
+  res.json({ success: true });
+});
+
+
 // ---------------------------------------------------------------------------
 // USER SETTINGS API — change username or password. Two separate routes
 // since they're independent actions with different validation needs

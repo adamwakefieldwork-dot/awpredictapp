@@ -35,6 +35,8 @@ db.exec(`
     email TEXT UNIQUE,
     password_hashed TEXT,
     userroleid INTEGER,
+    resettoken TEXT,
+    resettokenexpiry TEXT,
     FOREIGN KEY (userroleid) REFERENCES userrole(id)
   )
 `);

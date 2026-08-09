@@ -23,6 +23,10 @@
                 <input type="password" id="password" name="password" placeholder="Enter your password" required>
             </div>
 
+            <!-- NEW — link to the forgot-password flow -->
+            <p class="forgot-link"><a href="forgot-password.html">Forgot password?</a></p>
+
+            <p id="success-message" style="color: green; display: none;"></p>
             <p id="error-message" style="color: red; display: none;"></p>
 
             <button type="submit" class="btn-signin">Sign In</button>
@@ -33,12 +37,24 @@
 </div>
 
 <script>
+  // Checks for ?reset=success (from reset-password.html) OR
+  // ?signup=success (from signup.html) and shows the right message.
+  const params = new URLSearchParams(window.location.search);
+  const successEl = document.getElementById('success-message');
+
+  if (params.get('reset') === 'success') {
+    successEl.textContent = 'Password reset — please log in';
+    successEl.style.display = 'block';
+    window.history.replaceState({}, '', '/signin');
+  } else if (params.get('signup') === 'success') {
+    successEl.textContent = 'Account created — please log in';
+    successEl.style.display = 'block';
+    window.history.replaceState({}, '', '/signin');
+  }
+
   document.querySelector('form').addEventListener('submit', async (e) => {
     e.preventDefault();
 
-    // Reading from #email now instead of #username — matches the
-    // renamed field above, and the {email, password} shape the
-    // server's /api/signin route now expects.
     const email = document.getElementById('email').value;
     const password = document.getElementById('password').value;
     const errorEl = document.getElementById('error-message');
