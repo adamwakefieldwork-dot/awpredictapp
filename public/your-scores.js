@@ -20,6 +20,27 @@ const saveBtn = document.getElementById('save-button');
 const saveMessage = document.getElementById('save-message');
 
 // ---------------------------------------------------------------------
+// Converts a raw UTC date string like "2026-08-21T19:00:00Z" into a
+// readable UK-format string, e.g. "Fri 21 Aug, 7:00 PM".
+// ---------------------------------------------------------------------
+function formatFixtureDate(utcDateString) {
+    const date = new Date(utcDateString);
+
+    const datePart = date.toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+    });
+
+    const timePart = date.toLocaleTimeString('en-GB', {
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+
+    return `${datePart}, ${timePart}`;
+}
+
+// ---------------------------------------------------------------------
 // FETCH + RENDER a given gameweek's fixtures
 // ---------------------------------------------------------------------
 async function loadGameweek(gameweek) {
@@ -84,24 +105,30 @@ function renderFixtures(games) {
     let html = '';
 
     for (const game of games) {
-        // A game is only editable while its status is "Not Played".
-        // We compute this once per game and use it in two places below:
-        // whether the <input> gets `disabled`, and what value it shows.
-        const isEditable = game.status === 'Not Played';
+        // A game is only editable while it hasn't finished yet. Anything
+        // other than 'FINISHED' (SCHEDULED, TIMED, IN_PLAY, PAUSED,
+        // POSTPONED, etc.) is still open for predictions.
+        const isEditable = game.status !== 'FINISHED';
 
         // If the user already saved a prediction for this game earlier,
         // the server includes it as predictedHomeScore/predictedAwayScore.
         // We pre-fill the input with that value so it doesn't look blank
         // and unsaved every time they revisit the page.
-        const date = game.date
+        const date = formatFixtureDate(game.date);
         const homeVal = game.predictedHomeScore ?? '';
         const awayVal = game.predictedAwayScore ?? '';
 
         html += `
             <div class="fixture-block">
-                <div class="date-label">${game.date}</div>
+                <div class="date-label">${date}</div>
 
                 <div class="fixture-row" data-game-id="${game.id}">
+                    <img
+                        class="team-crest"
+                        src="${game.hometeamcrest ?? ''}"
+                        alt="${game.hometeamname} crest"
+                        onerror="this.style.visibility='hidden'"
+                    >
                     <span class="home-team-name">${game.hometeamname}</span>
 
                     <input
@@ -123,6 +150,12 @@ function renderFixtures(games) {
                     >
 
                     <span class="away-team-name">${game.awayteamname}</span>
+                    <img
+                        class="team-crest"
+                        src="${game.awayteamcrest ?? ''}"
+                        alt="${game.awayteamname} crest"
+                        onerror="this.style.visibility='hidden'"
+                    >
                 </div>
             </div>
         `;

@@ -16,6 +16,7 @@
     padding: 10px 16px;
     border-bottom: 1px solid #eee;
     text-align: center;
+    vertical-align: middle;
 }
 
 .all-scores-table thead th {
@@ -57,9 +58,30 @@
     background-color: white;
 }
 
+/* Wraps the crest + team names + result on one line, so the crest
+   images sit inline with the text rather than stacking above it */
+.fixture-col .fixture-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+/* Small crest icons shown inline within the fixture cell — deliberately
+   smaller than the your-scores.js crests, since this table is dense
+   and has many rows visible at once */
+.team-crest-mini {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    vertical-align: middle;
+    display: inline-block;
+}
+
 .fixture-col .fixture-date {
     font-size: 0.75rem;
     color: #888;
+    align-items: left;
 }
 
 /* =========================================================

@@ -2,12 +2,16 @@ const express = require('express');
 const path = require('path');
 const session = require('express-session');
 const bcrypt = require('bcrypt');
+const crypto = require('crypto');
 const db = require('./db/init');
+const { fetchAndSync } = require('./db/import-football');
 
 const app = express();
 const PORT = 3000;
 
 require('dotenv').config();
+
+const ALLOW_LEAGUE_CREATION = process.env.ALLOW_LEAGUE_CREATION !== 'false';
 
 app.use(express.json());
 
@@ -62,6 +66,19 @@ function requireLeague(req, res, next) {
   return res.redirect('/app/join-league.html');
 }
 
+// ─────────────────────────────────────────────
+// Shared join-code generator — used by create-league. Keeps retrying
+// until it lands on a code not already in use.
+// ─────────────────────────────────────────────
+function generateUniqueJoinCode() {
+  const exists = db.prepare('SELECT 1 FROM leagues WHERE joinID = ?');
+  let code;
+  do {
+    code = crypto.randomBytes(4).toString('hex').toUpperCase();
+  } while (exists.get(code));
+  return code;
+}
+
 app.get('/', (req, res) => {
   res.redirect('/signin');
 });
@@ -81,7 +98,7 @@ app.post('/api/signup', async (req, res) => {
     const hashed = await bcrypt.hash(password, 10);
 
     const insert = db.prepare(
-      'INSERT INTO users (username, name, email, password_hashed, userroleid) VALUES (?, ?, ?, ?, 1)'
+      'INSERT INTO users (username, name, email, passwordhashed, userroleid) VALUES (?, ?, ?, ?, 1)'
     );
     insert.run(username, username, email, hashed);
 
@@ -113,7 +130,7 @@ app.post('/api/signin', async (req, res) => {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
 
-  const match = await bcrypt.compare(password, user.password_hashed);
+  const match = await bcrypt.compare(password, user.passwordhashed);
   if (!match) {
     return res.status(401).json({ error: 'Invalid email or password' });
   }
@@ -126,7 +143,6 @@ app.post('/api/signout', (req, res) => {
   req.session.destroy(() => res.json({ success: true }));
 });
 
-const crypto = require('crypto');
 const { Resend } = require('resend');
 const resend = new Resend(process.env.RESEND_API_KEY);
 
@@ -144,7 +160,7 @@ app.post('/api/forgot-password', async (req, res) => {
 
   if (user) {
     // The raw token goes in the emailed link — the DATABASE only ever
-    // stores a hash of it, same principle as password_hashed. If the
+    // stores a hash of it, same principle as passwordhashed. If the
     // database leaked, the stored hashes alone can't be used to reset
     // anyone's password.
     const rawToken = crypto.randomBytes(32).toString('hex');
@@ -210,13 +226,12 @@ app.post('/api/reset-password', async (req, res) => {
   // Clearing resettoken/resettokenexpiry means this exact link can never
   // be used a second time, even within its 1-hour window.
   db.prepare(`
-    UPDATE users SET password_hashed = ?, resettoken = NULL, resettokenexpiry = NULL
+    UPDATE users SET passwordhashed = ?, resettoken = NULL, resettokenexpiry = NULL
     WHERE id = ?
   `).run(newHashed, user.id);
 
   res.json({ success: true });
 });
-
 
 // ---------------------------------------------------------------------------
 // USER SETTINGS API — change username or password. Two separate routes
@@ -264,15 +279,15 @@ app.post('/api/change-password', async (req, res) => {
   // who walked up to an unlocked browser) could silently lock the
   // real owner out by setting a new password with no proof they know
   // the old one.
-  const user = db.prepare('SELECT password_hashed FROM users WHERE id = ?').get(userId);
-  const match = await bcrypt.compare(currentPassword, user.password_hashed);
+  const user = db.prepare('SELECT passwordhashed FROM users WHERE id = ?').get(userId);
+  const match = await bcrypt.compare(currentPassword, user.passwordhashed);
 
   if (!match) {
     return res.status(401).json({ error: 'Current password is incorrect' });
   }
 
   const newHashed = await bcrypt.hash(newPassword, 10);
-  db.prepare('UPDATE users SET password_hashed = ? WHERE id = ?').run(newHashed, userId);
+  db.prepare('UPDATE users SET passwordhashed = ? WHERE id = ?').run(newHashed, userId);
 
   res.json({ success: true });
 });
@@ -340,6 +355,100 @@ app.post('/api/join-league', requireLoginApi, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// COMPETITIONS / SEASONS API — powers the dropdowns on the create-league
+// form. Only returns competitions/seasons that actually have games
+// loaded against them, so the user can't pick something with no fixtures.
+// ---------------------------------------------------------------------------
+
+app.get('/api/competitions', requireLoginApi, (req, res) => {
+  const competitions = db.prepare(`
+    SELECT DISTINCT competitions.id, competitions.name, competitions.code, competitions.emblem
+    FROM competitions
+    JOIN games ON games.competitionid = competitions.id
+    ORDER BY competitions.name
+  `).all();
+
+  res.json({ competitions });
+});
+
+app.get('/api/competitions/:competitionId/seasons', requireLoginApi, (req, res) => {
+  const seasons = db.prepare(`
+    SELECT DISTINCT seasons.id, seasons.startdate, seasons.enddate, seasons.winner
+    FROM seasons
+    JOIN games ON games.seasonid = seasons.id
+    WHERE games.competitionid = ?
+    ORDER BY seasons.startdate DESC
+  `).all(req.params.competitionId);
+
+  res.json({ seasons });
+});
+
+// POST /api/create-league — mirrors /api/join-league's shape: creates the
+// league row, adds the creator as owner in leagueuser, and sets it as
+// currentleague for this session so the next page load lands them in it.
+app.post('/api/create-league', requireLoginApi, (req, res) => {
+    if (!ALLOW_LEAGUE_CREATION) {
+    return res.status(403).json({ error: 'League creation is currently disabled' });
+  }
+  const userId = req.session.userId;
+  const { name, competitionId, seasonId } = req.body;
+
+  if (!name || !competitionId || !seasonId) {
+    return res.status(400).json({ error: 'Name, competition and season are required' });
+  }
+
+  // Confirm this competition/season pairing actually has games, same
+  // check the dropdown endpoints rely on — protects against a tampered
+  // request sending a mismatched pair.
+  const validPair = db.prepare(`
+    SELECT 1 FROM games WHERE competitionid = ? AND seasonid = ? LIMIT 1
+  `).get(competitionId, seasonId);
+
+  if (!validPair) {
+    return res.status(400).json({ error: 'That season does not belong to that competition' });
+  }
+
+  const joinID = generateUniqueJoinCode();
+
+  const insertLeague = db.prepare(`
+    INSERT INTO leagues (
+      name, joinID, seasonid, competitionid,
+      wildcardonoff, winscore, perfectscore, losescore,
+      wildcardwinscore, wildcardlosescore, updatedatetime
+    ) VALUES (?, ?, ?, ?, 0, 1, 3, 0, 1, 0, CURRENT_TIMESTAMP)
+  `);
+
+  const insertOwner = db.prepare(`
+    INSERT INTO leagueuser (leaguesid, userid, owner) VALUES (?, ?, 'yes')
+  `);
+
+  const createLeague = db.transaction(() => {
+    const result = insertLeague.run(name, joinID, seasonId, competitionId);
+    insertOwner.run(result.lastInsertRowid, userId);
+    return result.lastInsertRowid;
+  });
+
+  try {
+    const leagueId = createLeague();
+    req.session.currentleague = leagueId;
+    res.json({ success: true, leagueId, joinID });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// HIDING FLAG API— powers the "Your Scores" page
+// ---------------------------------------------------------------------------
+
+// GET /api/app-config — lets the frontend know which features are
+// currently switched on, without needing a page reload to change.
+app.get('/api/app-config', (req, res) => {
+  res.json({ allowLeagueCreation: ALLOW_LEAGUE_CREATION });
+});
+
+// ---------------------------------------------------------------------------
 // SCORES API — powers the "Your Scores" page
 // ---------------------------------------------------------------------------
 
@@ -351,7 +460,7 @@ app.get('/api/scores', requireLoginApi, (req, res) => {
     return res.status(400).json({ error: 'No league selected' });
   }
 
-  const range = db.prepare('SELECT MIN(gameweek) AS min, MAX(gameweek) AS max FROM games').get();
+  const range = db.prepare('SELECT MIN(matchday) AS min, MAX(matchday) AS max FROM games').get();
 
   if (range.min === null) {
     return res.json({ gameweek: null, minGameweek: null, maxGameweek: null, games: [] });
@@ -363,23 +472,25 @@ app.get('/api/scores', requireLoginApi, (req, res) => {
     gameweek = Number(req.query.gameweek);
   } else {
     const nextUnplayed = db.prepare(`
-      SELECT MIN(gameweek) AS gw FROM games WHERE status = 'Not Played'
+      SELECT MIN(matchday) AS gw FROM games WHERE status != 'FINISHED'
     `).get();
     gameweek = nextUnplayed.gw ?? range.min;
   }
 
   const games = db.prepare(`
     SELECT
-      games.id,
-      games.date,
-      games.status,
-      hometeam.name AS hometeamname,
-      awayteam.name AS awayteamname
+        games.id,
+        games.utcdate AS date,
+        games.status,
+        hometeam.name AS hometeamname,
+        hometeam.crest AS hometeamcrest,
+        awayteam.name AS awayteamname,
+        awayteam.crest AS awayteamcrest
     FROM games
     JOIN teams AS hometeam ON games.hometeamid = hometeam.id
     JOIN teams AS awayteam ON games.awayteamid = awayteam.id
-    WHERE games.gameweek = ?
-    ORDER BY games.date
+    WHERE games.matchday = ?
+    ORDER BY games.utcdate
   `).all(gameweek);
 
   const existingScore = db.prepare(`
@@ -436,7 +547,7 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
       if (!game) {
         throw new Error(`Game ${p.gameId} does not exist`);
       }
-      if (game.status !== 'Not Played') {
+      if (game.status === 'FINISHED') {
         throw new Error(`Game ${p.gameId} is no longer editable`);
       }
 
@@ -475,21 +586,24 @@ app.get('/api/all-scores', requireLoginApi, (req, res) => {
 
   // Every game, across every gameweek — ordered so the frontend can
   // group consecutive rows into "Gameweek 1", "Gameweek 2", etc.
-  // sections just by watching for when gameweek changes as it loops.
+  // sections just by watching for when gameweek (matchday) changes as
+  // it loops.
   const games = db.prepare(`
     SELECT
-      games.id,
-      games.date,
-      games.gameweek,
-      games.status,
-      games.hometeamscore,
-      games.awayteamscore,
-      hometeam.name AS hometeamname,
-      awayteam.name AS awayteamname
+        games.id,
+        games.utcdate AS date,
+        games.matchday AS gameweek,
+        games.status,
+        games.scorefulltimehome AS hometeamscore,
+        games.scorefulltimeaway AS awayteamscore,
+        hometeam.name AS hometeamname,
+        hometeam.crest AS hometeamcrest,
+        awayteam.name AS awayteamname,
+        awayteam.crest AS awayteamcrest
     FROM games
     JOIN teams AS hometeam ON games.hometeamid = hometeam.id
     JOIN teams AS awayteam ON games.awayteamid = awayteam.id
-    ORDER BY games.gameweek, games.date
+    ORDER BY games.matchday, games.utcdate
   `).all();
 
   // Every member of the current league — becomes the column list.
@@ -551,30 +665,30 @@ app.get('/api/dashboard', requireLoginApi, (req, res) => {
       END) AS predictionsmade,
 
       COUNT(CASE
-        WHEN games.hometeamscore IS NOT NULL
-         AND games.awayteamscore IS NOT NULL
+        WHEN games.scorefulltimehome IS NOT NULL
+         AND games.scorefulltimeaway IS NOT NULL
          AND playersscore.hometeamscore IS NOT NULL
          AND playersscore.awayteamscore IS NOT NULL
         THEN 1
       END) AS gamesplayedpredicted,
 
       COUNT(CASE
-        WHEN games.hometeamscore = playersscore.hometeamscore
-         AND games.awayteamscore = playersscore.awayteamscore
+        WHEN games.scorefulltimehome = playersscore.hometeamscore
+         AND games.scorefulltimeaway = playersscore.awayteamscore
         THEN 1
       END) AS perfectcount,
 
       COUNT(CASE
-        WHEN games.hometeamscore IS NOT NULL
+        WHEN games.scorefulltimehome IS NOT NULL
          AND playersscore.hometeamscore IS NOT NULL
          AND NOT (
-             games.hometeamscore = playersscore.hometeamscore
-             AND games.awayteamscore = playersscore.awayteamscore
+             games.scorefulltimehome = playersscore.hometeamscore
+             AND games.scorefulltimeaway = playersscore.awayteamscore
          )
          AND (
-             (playersscore.hometeamscore > playersscore.awayteamscore AND games.hometeamscore > games.awayteamscore)
-             OR (playersscore.hometeamscore < playersscore.awayteamscore AND games.hometeamscore < games.awayteamscore)
-             OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.hometeamscore = games.awayteamscore)
+             (playersscore.hometeamscore > playersscore.awayteamscore AND games.scorefulltimehome > games.scorefulltimeaway)
+             OR (playersscore.hometeamscore < playersscore.awayteamscore AND games.scorefulltimehome < games.scorefulltimeaway)
+             OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.scorefulltimehome = games.scorefulltimeaway)
          )
         THEN 1
       END) AS correctcount
@@ -616,9 +730,14 @@ app.get('/api/leaguesettings', requireLoginApi, (req, res) => {
       leagues.losescore,
       leagues.wildcardwinscore,
       leagues.wildcardlosescore,
-      leagues.hidetime
+      leagues.hidetime,
+      competitions.name AS competitionname,
+      seasons.startdate AS seasonstartdate,
+      seasons.enddate AS seasonenddate
     FROM leagues
     JOIN leagueuser ON leagues.id = leagueuser.leaguesid
+    JOIN competitions ON competitions.id = leagues.competitionid
+    JOIN seasons ON seasons.id = leagues.seasonid
     WHERE leagueuser.userid = ?
       AND leagueuser.leaguesid = ?
       AND leagueuser.owner = 'yes'
@@ -692,8 +811,9 @@ app.post('/api/leaguesettings', requireLoginApi, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GAME RESULTS API — records a game's final score and recalculates
-// every player's leaguescore for that game
+// GAME RESULTS API — recalculates every player's leaguescore whenever
+// the league's own settings have changed more recently than the scores
+// were last touched.
 // ---------------------------------------------------------------------------
 
 app.post('/api/recalculate-league-scores', requireLoginApi, (req, res) => {
@@ -733,21 +853,21 @@ app.post('/api/recalculate-league-scores', requireLoginApi, (req, res) => {
                 WHEN playersscore.wildcardused = 'yes' THEN
                     CASE
                         WHEN (
-                            (playersscore.hometeamscore > playersscore.awayteamscore AND games.hometeamscore > games.awayteamscore)
-                            OR (playersscore.hometeamscore < playersscore.awayteamscore AND games.hometeamscore < games.awayteamscore)
-                            OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.hometeamscore = games.awayteamscore)
+                            (playersscore.hometeamscore > playersscore.awayteamscore AND games.scorefulltimehome > games.scorefulltimeaway)
+                            OR (playersscore.hometeamscore < playersscore.awayteamscore AND games.scorefulltimehome < games.scorefulltimeaway)
+                            OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.scorefulltimehome = games.scorefulltimeaway)
                         )
                         THEN leagues.wildcardwinscore
                         ELSE leagues.wildcardlosescore
                     END
                 ELSE
                     CASE
-                        WHEN playersscore.hometeamscore = games.hometeamscore AND playersscore.awayteamscore = games.awayteamscore
+                        WHEN playersscore.hometeamscore = games.scorefulltimehome AND playersscore.awayteamscore = games.scorefulltimeaway
                         THEN leagues.perfectscore
                         WHEN (
-                            (playersscore.hometeamscore > playersscore.awayteamscore AND games.hometeamscore > games.awayteamscore)
-                            OR (playersscore.hometeamscore < playersscore.awayteamscore AND games.hometeamscore < games.awayteamscore)
-                            OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.hometeamscore = games.awayteamscore)
+                            (playersscore.hometeamscore > playersscore.awayteamscore AND games.scorefulltimehome > games.scorefulltimeaway)
+                            OR (playersscore.hometeamscore < playersscore.awayteamscore AND games.scorefulltimehome < games.scorefulltimeaway)
+                            OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.scorefulltimehome = games.scorefulltimeaway)
                         )
                         THEN leagues.winscore
                         ELSE leagues.losescore
@@ -797,4 +917,17 @@ app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] })
 
 app.listen(PORT, () => {
   console.log(`awpredictapp running on port ${PORT}`);
+});
+
+// ---------------------------------------------------------------------------
+// IMPORTING UPDATED SCORES
+// ---------------------------------------------------------------------------
+
+app.listen(PORT, () => {
+  console.log(`awpredictapp running on port ${PORT}`);
+
+  // Run the API sync when the server boots up
+  fetchAndSync()
+    .then(() => console.log('Initial Football API sync finished.'))
+    .catch((err) => console.error('Initial sync failed:', err));
 });

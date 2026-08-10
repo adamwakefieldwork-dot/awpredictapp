@@ -1,5 +1,3 @@
-
-
 /* =========================================================
    GAMEWEEK NAVIGATOR
    Also flexbox — three items in a row (arrow, label, arrow),
@@ -49,18 +47,21 @@
 
 /* =========================================================
    INDIVIDUAL FIXTURE ROW
-   This is the key layout piece. CSS Grid (not Flexbox) because
-   we want fixed-width, PREDICTABLE columns that line up exactly
-   the same way on every row, regardless of how long team names are.
+   CSS Grid (not Flexbox) because we want fixed-width,
+   PREDICTABLE columns that line up exactly the same way on
+   every row, regardless of how long team names are.
 
    Columns, left to right:
-     1. home team name   (flexible width, text right-aligned toward center)
-     2. home score input  (fixed width)
-     3. dash "-"           (fixed width, small)
-     4. away score input  (fixed width)
-     5. away team name    (flexible width, text left-aligned toward center)
+     1. home crest       (fixed width, small)
+     2. home team name   (flexible width, text right-aligned toward center)
+     3. home score input  (fixed width)
+     4. dash "-"           (fixed width, small)
+     5. away score input  (fixed width)
+     6. away team name    (flexible width, text left-aligned toward center)
+     7. away crest       (fixed width, small)
    ========================================================= */
-/* NEW — wraps the date + the fixture-row grid together as one unit,
+
+/* Wraps the date + the fixture-row grid together as one unit,
    so each fixture (date + teams + scores) forms a visually distinct
    block, with its own bottom border separating it from the next one. */
 .fixture-block {
@@ -71,7 +72,7 @@
     border-bottom: 1px solid #eee;
 }
 
-/* NEW — simple styling for the date line sitting above each fixture */
+/* Simple styling for the date line sitting above each fixture */
 .date-label {
     font-size: 0.85rem;
     color: #666;
@@ -79,14 +80,22 @@
     margin-bottom: 4px;
 }
 
-/* .fixture-row stays exactly as it was — no changes needed here,
-   since it's back to holding exactly 5 items again */
 .fixture-row {
     display: grid;
-    grid-template-columns: 1fr 70px 24px 70px 1fr;
+    grid-template-columns: 32px 1fr 70px 24px 70px 1fr 32px;
     align-items: center;
     gap: 12px;
     padding: 14px 0;
+}
+
+/* Team crest images, sitting on the outer edges of the row nearest
+   each team's name. object-fit: contain keeps the crest's own aspect
+   ratio intact regardless of the source image's dimensions. */
+.team-crest {
+    width: 48px;
+    height: 48px;
+    object-fit: contain;
+    justify-self: center;
 }
 
 .home-team-name {
@@ -117,16 +126,15 @@
     color: white;
 }
 
-/* When a game's status isn't "Not Played", JS adds the `disabled`
-   attribute to the input — this styles that state so it's visually
-   obvious the box can't be edited anymore. */
+/* When a game's status is FINISHED, JS adds the `disabled` attribute
+   to the input — this styles that state so it's visually obvious the
+   box can't be edited anymore. */
 .score-input:disabled {
     background-color: #b0b0b0;
     border-color: #888;
     color: #eee;
     cursor: not-allowed;
 }
-
 
 /* Chrome, Safari, Edge (all WebKit/Blink-based) use these
    pseudo-elements to render the spinner arrows */
@@ -141,7 +149,6 @@
 .score-input[type="number"] {
     -moz-appearance: textfield;
 }
-
 
 .loading-msg {
     text-align: center;

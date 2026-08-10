@@ -83,3 +83,11 @@
 .signout-link a:hover {
     text-decoration: underline;
 }
+
+.tab-panel {
+    display: none;
+}
+
+.tab-panel.active {
+    display: block;
+}

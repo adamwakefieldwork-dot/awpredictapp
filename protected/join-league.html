@@ -3,34 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Join a League</title>
+    <title>Join or Create a League</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/join-league.css">
 </head>
 <body>
 
-<!-- Deliberately NO header/nav here — the whole point of this page is
-     that someone with no league yet can't go anywhere else in the app,
-     so there's nothing for a nav bar to link to. -->
 <div class="join-container">
     <div class="join-box">
-        <h1>Join a League</h1>
-        <p class="subtitle">Enter the join code your league organiser shared with you</p>
 
-        <form id="join-form">
-            <div class="form-group">
-                <label for="join-code">Join Code</label>
-                <input type="text" id="join-code" name="joinCode" placeholder="e.g. ABC123" required>
-            </div>
+        <div class="tab-switch">
+            <button type="button" class="tab-btn active" data-tab="join">Join a League</button>
+            <button type="button" class="tab-btn" data-tab="create">Create a League</button>
+        </div>
 
-            <p id="error-message" class="error-message"></p>
+        <!-- JOIN PANEL -->
+        <div id="join-panel" class="tab-panel active">
+            <h1>Join a League</h1>
+            <p class="subtitle">Enter the join code your league organiser shared with you</p>
 
-            <button type="submit" class="btn-join">Join League</button>
-        </form>
+            <form id="join-form">
+                <div class="form-group">
+                    <label for="join-code">Join Code</label>
+                    <input type="text" id="join-code" name="joinCode" placeholder="e.g. ABC123" required>
+                </div>
 
-        <!-- Sign out is the only other action available from here —
-             useful if someone signed up without a code and wants to
-             stop, or realizes they used the wrong account. -->
+                <p id="join-error-message" class="error-message"></p>
+
+                <button type="submit" class="btn-join">Join League</button>
+            </form>
+        </div>
+
+        <!-- CREATE PANEL -->
+        <div id="create-panel" class="tab-panel">
+            <h1>Create a League</h1>
+            <p class="subtitle">Pick a competition and season, then give your league a name</p>
+
+            <form id="create-form">
+                <div class="form-group">
+                    <label for="league-name">League Name</label>
+                    <input type="text" id="league-name" name="leagueName" placeholder="e.g. Office Predictions" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="competition-select">Competition</label>
+                    <select id="competition-select" name="competitionId" required>
+                        <option value="" disabled selected>Loading competitions...</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="season-select">Season</label>
+                    <select id="season-select" name="seasonId" required disabled>
+                        <option value="" disabled selected>Select a competition first</option>
+                    </select>
+                </div>
+
+                <p id="create-error-message" class="error-message"></p>
+
+                <button type="submit" class="btn-join">Create League</button>
+            </form>
+        </div>
+
         <p class="signout-link"><a href="#" id="signout-link">Sign out</a></p>
     </div>
 </div>

@@ -28,6 +28,27 @@ async function loadAllScores() {
     }
 }
 
+// ---------------------------------------------------------------------
+// Converts a raw UTC date string like "2026-08-21T19:00:00Z" into a
+// readable UK-format string, e.g. "Fri 21 Aug, 7:00 PM".
+// ---------------------------------------------------------------------
+function formatFixtureDate(utcDateString) {
+    const date = new Date(utcDateString);
+
+    const datePart = date.toLocaleDateString('en-GB', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short'
+    });
+
+    const timePart = date.toLocaleTimeString('en-GB', {
+        hour: 'numeric',
+        minute: '2-digit'
+    });
+
+    return `${datePart}, ${timePart}`;
+}
+
 function buildPredictionMap(predictions) {
     const map = {};
     for (const p of predictions) {
@@ -66,18 +87,25 @@ function renderTable(games, users, predictions) {
 
         const hasResult = game.hometeamscore !== null && game.awayteamscore !== null;
 
+        // Crests sit inline with each team name — small icons, not the
+        // score, which stays as plain text in the "vs"/result line.
+        const homeCrestImg = `<img class="team-crest-mini" src="${game.hometeamcrest ?? ''}" alt="${game.hometeamname} crest" onerror="this.style.visibility='hidden'">`;
+        const awayCrestImg = `<img class="team-crest-mini" src="${game.awayteamcrest ?? ''}" alt="${game.awayteamname} crest" onerror="this.style.visibility='hidden'">`;
+
         // Result now shown INLINE with the team names, rather than on
         // a separate line — "Arsenal 2 - 1 Coventry City" once played,
         // or just "Arsenal vs Coventry City" before kickoff.
         const fixtureLine = hasResult
-            ? `${game.hometeamname} ${game.hometeamscore} - ${game.awayteamscore} ${game.awayteamname}`
-            : `${game.hometeamname} vs ${game.awayteamname}`;
+            ? `${homeCrestImg} ${game.hometeamname} ${game.hometeamscore} - ${game.awayteamscore} ${game.awayteamname} ${awayCrestImg}`
+            : `${homeCrestImg} ${game.hometeamname} vs ${game.awayteamname} ${awayCrestImg}`;
+
+        const fixtureDate = formatFixtureDate(game.date);
 
         bodyHtml += `
             <tr>
                 <td class="fixture-col">
-                    <div>${fixtureLine}</div>
-                    <div class="fixture-date">${game.date}</div>
+                    <div class="fixture-line">${fixtureLine}</div>
+                    <div class="fixture-date">${fixtureDate}</div>
                 </td>
         `;
 

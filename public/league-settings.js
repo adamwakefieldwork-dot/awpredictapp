@@ -33,8 +33,14 @@ async function loadSettings() {
 // Build the form fields from the league object the server sent back.
 // wildcardonoff is stored as 0/1 in SQLite — "checked" only gets added
 // to the checkbox's HTML when it's 1, which is what makes it pre-ticked.
+//
+// competitionname and season are read-only, same treatment as join-id —
+// a league's competition/season is fixed at creation time, so there's
+// nothing to send back for these on Save.
 // ---------------------------------------------------------------------
 function renderForm(league) {
+    const seasonLabel = formatSeason(league.seasonstartdate, league.seasonenddate);
+
     formWrapper.innerHTML = `
         <div class="settings-form">
 
@@ -46,6 +52,16 @@ function renderForm(league) {
             <div class="settings-row">
                 <label for="join-id">Join Code</label>
                 <input type="text" id="join-id" value="${league.joinid}" readonly>
+            </div>
+
+            <div class="settings-row">
+                <label for="competition-name">Competition</label>
+                <input type="text" id="competition-name" value="${league.competitionname}" readonly>
+            </div>
+
+            <div class="settings-row">
+                <label for="season">Season</label>
+                <input type="text" id="season" value="${seasonLabel}" readonly>
             </div>
 
             <div class="settings-row">
@@ -88,6 +104,24 @@ function renderForm(league) {
 }
 
 // ---------------------------------------------------------------------
+// Turns seasonstartdate/seasonenddate ("2025-08-01"/"2026-05-24") into
+// a compact "2025/26" style label. Falls back gracefully if either
+// date is missing.
+// ---------------------------------------------------------------------
+function formatSeason(startdate, enddate) {
+    if (!startdate) return '';
+
+    const startYear = startdate.slice(0, 4);
+    const endYear = enddate ? enddate.slice(0, 4) : null;
+
+    if (!endYear || endYear === startYear) {
+        return startYear;
+    }
+
+    return `${startYear}/${endYear.slice(2)}`;
+}
+
+// ---------------------------------------------------------------------
 // SAVE — read every field's current value and send it as one object.
 // ---------------------------------------------------------------------
 saveBtn.addEventListener('click', async () => {
@@ -100,7 +134,8 @@ saveBtn.addEventListener('click', async () => {
         wildcardwinscore: Number(document.getElementById('wildcard-win-score').value),
         wildcardlosescore: Number(document.getElementById('wildcard-lose-score').value),
         hidetime: document.getElementById('hide-time').value
-        // joinid intentionally excluded — read-only, never sent back
+        // joinid, competitionname, season intentionally excluded —
+        // all read-only, never sent back
     };
 
     try {
