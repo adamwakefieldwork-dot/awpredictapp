@@ -58,7 +58,9 @@ function buildPredictionMap(predictions) {
 }
 
 function renderTable(games, users, predictions) {
-    let headerHtml = '<th class="fixture-col-header">Fixture</th>';
+    // "Result" sits as its own column, between the fixture and the
+    // first user's column — same header row, just one more <th>.
+    let headerHtml = '<th class="fixture-col-header">Fixture</th><th class="result-col-header">Result</th>';
     for (const user of users) {
         headerHtml += `<th>${user.username}</th>`;
     }
@@ -70,7 +72,7 @@ function renderTable(games, users, predictions) {
     }
 
     const predictionMap = buildPredictionMap(predictions);
-    const columnCount = users.length + 1;
+    const columnCount = users.length + 2; // +1 fixture, +1 result
 
     let bodyHtml = '';
     let lastGameweekSeen = null;
@@ -88,18 +90,20 @@ function renderTable(games, users, predictions) {
         const hasResult = game.hometeamscore !== null && game.awayteamscore !== null;
 
         // Crests sit inline with each team name — small icons, not the
-        // score, which stays as plain text in the "vs"/result line.
+        // score, which now lives in its own dedicated Result column.
         const homeCrestImg = `<img class="team-crest-mini" src="${game.hometeamcrest ?? ''}" alt="${game.hometeamname} crest" onerror="this.style.visibility='hidden'">`;
         const awayCrestImg = `<img class="team-crest-mini" src="${game.awayteamcrest ?? ''}" alt="${game.awayteamname} crest" onerror="this.style.visibility='hidden'">`;
 
-        // Result now shown INLINE with the team names, rather than on
-        // a separate line — "Arsenal 2 - 1 Coventry City" once played,
-        // or just "Arsenal vs Coventry City" before kickoff.
-        const fixtureLine = hasResult
-            ? `${homeCrestImg} ${game.hometeamname} ${game.hometeamscore} - ${game.awayteamscore} ${game.awayteamname} ${awayCrestImg}`
-            : `${homeCrestImg} ${game.hometeamname} vs ${game.awayteamname} ${awayCrestImg}`;
+        // Fixture column now ALWAYS shows "vs" — the actual score, if
+        // there is one, appears separately in the Result column.
+        const fixtureLine = `${homeCrestImg} ${game.hometeamname} vs ${game.awayteamname} ${awayCrestImg}`;
 
         const fixtureDate = formatFixtureDate(game.date);
+
+        // Result column — blank until the game has actually been played.
+        const resultText = hasResult
+            ? `${game.hometeamscore} - ${game.awayteamscore}`
+            : '';
 
         bodyHtml += `
             <tr>
@@ -107,6 +111,7 @@ function renderTable(games, users, predictions) {
                     <div class="fixture-line">${fixtureLine}</div>
                     <div class="fixture-date">${fixtureDate}</div>
                 </td>
+                <td class="result-col">${resultText}</td>
         `;
 
         for (const user of users) {

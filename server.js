@@ -4,7 +4,10 @@ const session = require('express-session');
 const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const db = require('./db/init');
+const cron = require('node-cron');
 const { fetchAndSync } = require('./db/import-football');
+const { calculateScores } = require('./db/calcscores');
+
 
 const app = express();
 const PORT = 3000;
@@ -460,10 +463,12 @@ app.get('/api/scores', requireLoginApi, (req, res) => {
     return res.status(400).json({ error: 'No league selected' });
   }
 
+  const league = db.prepare('SELECT wildcardonoff FROM leagues WHERE id = ?').get(currentleague);
+
   const range = db.prepare('SELECT MIN(matchday) AS min, MAX(matchday) AS max FROM games').get();
 
   if (range.min === null) {
-    return res.json({ gameweek: null, minGameweek: null, maxGameweek: null, games: [] });
+    return res.json({ gameweek: null, minGameweek: null, maxGameweek: null, wildcardEnabled: false, games: [] });
   }
 
   let gameweek;
@@ -479,13 +484,13 @@ app.get('/api/scores', requireLoginApi, (req, res) => {
 
   const games = db.prepare(`
     SELECT
-        games.id,
-        games.utcdate AS date,
-        games.status,
-        hometeam.name AS hometeamname,
-        hometeam.crest AS hometeamcrest,
-        awayteam.name AS awayteamname,
-        awayteam.crest AS awayteamcrest
+      games.id,
+      games.utcdate AS date,
+      games.status,
+      hometeam.name AS hometeamname,
+      hometeam.crest AS hometeamcrest,
+      awayteam.name AS awayteamname,
+      awayteam.crest AS awayteamcrest
     FROM games
     JOIN teams AS hometeam ON games.hometeamid = hometeam.id
     JOIN teams AS awayteam ON games.awayteamid = awayteam.id
@@ -494,7 +499,7 @@ app.get('/api/scores', requireLoginApi, (req, res) => {
   `).all(gameweek);
 
   const existingScore = db.prepare(`
-    SELECT hometeamscore, awayteamscore FROM playersscore
+    SELECT hometeamscore, awayteamscore, wildcardused FROM playersscore
     WHERE userid = ? AND gameid = ? AND leagueid = ?
   `);
 
@@ -503,7 +508,8 @@ app.get('/api/scores', requireLoginApi, (req, res) => {
     return {
       ...game,
       predictedHomeScore: existing ? existing.hometeamscore : null,
-      predictedAwayScore: existing ? existing.awayteamscore : null
+      predictedAwayScore: existing ? existing.awayteamscore : null,
+      wildcardUsed: existing ? existing.wildcardused === 'yes' : false
     };
   });
 
@@ -511,6 +517,7 @@ app.get('/api/scores', requireLoginApi, (req, res) => {
     gameweek,
     minGameweek: range.min,
     maxGameweek: range.max,
+    wildcardEnabled: !!league.wildcardonoff,
     games: gamesWithPredictions
   });
 });
@@ -528,19 +535,68 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
     return res.status(400).json({ error: 'No predictions provided' });
   }
 
-  const getGame = db.prepare('SELECT status FROM games WHERE id = ?');
+  const getGame = db.prepare('SELECT status, matchday FROM games WHERE id = ?');
   const findExisting = db.prepare(`
     SELECT id FROM playersscore WHERE userid = ? AND gameid = ? AND leagueid = ?
   `);
   const updateScore = db.prepare(`
-    UPDATE playersscore SET hometeamscore = ?, awayteamscore = ?, updatedatetime = CURRENT_TIMESTAMP WHERE id = ?
+    UPDATE playersscore
+    SET hometeamscore = ?, awayteamscore = ?, wildcardused = ?, updatedatetime = CURRENT_TIMESTAMP
+    WHERE id = ?
   `);
   const insertScore = db.prepare(`
-    INSERT INTO playersscore (userid, leagueid, gameid, hometeamscore, awayteamscore, updatedatetime)
-    VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+    INSERT INTO playersscore (userid, leagueid, gameid, hometeamscore, awayteamscore, wildcardused, updatedatetime)
+    VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+  `);
+
+  // Counts how many wildcards this user already has active THIS
+  // gameweek, across games NOT included in the current submission.
+  // Needed because the incoming batch might only cover some of the
+  // gameweek's games — without this, a user could tick a wildcard on
+  // Game A, save, then separately tick one on Game B, save, and end up
+  // with two active wildcards in the same gameweek.
+  const countOtherWildcardsInMatchday = db.prepare(`
+    SELECT COUNT(*) AS count
+    FROM playersscore
+    JOIN games ON games.id = playersscore.gameid
+    WHERE playersscore.userid = ?
+      AND playersscore.leagueid = ?
+      AND games.matchday = ?
+      AND playersscore.wildcardused = 'yes'
+      AND playersscore.gameid != ?
   `);
 
   const saveAll = db.transaction((predictionList) => {
+    // First pass: validate the ONE-WILDCARD-PER-GAMEWEEK rule across the
+    // whole batch before writing anything, so a bad submission doesn't
+    // save some rows and reject others halfway through.
+    const wildcardCountByMatchday = {};
+
+    for (const p of predictionList) {
+      if (!p.wildcardUsed) continue;
+
+      const game = getGame.get(p.gameId);
+      if (!game) {
+        throw new Error(`Game ${p.gameId} does not exist`);
+      }
+
+      wildcardCountByMatchday[game.matchday] = (wildcardCountByMatchday[game.matchday] || 0) + 1;
+
+      // Also check against wildcards already saved for OTHER games in
+      // this same gameweek that aren't part of this submission.
+      const otherCount = countOtherWildcardsInMatchday.get(userId, currentleague, game.matchday, p.gameId).count;
+      if (otherCount > 0) {
+        throw new Error(`Only one wildcard can be used per gameweek (Gameweek ${game.matchday})`);
+      }
+    }
+
+    for (const matchday in wildcardCountByMatchday) {
+      if (wildcardCountByMatchday[matchday] > 1) {
+        throw new Error(`Only one wildcard can be used per gameweek (Gameweek ${matchday})`);
+      }
+    }
+
+    // Second pass: actually save, now that the batch is known to be valid.
     for (const p of predictionList) {
       const game = getGame.get(p.gameId);
 
@@ -551,12 +607,13 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
         throw new Error(`Game ${p.gameId} is no longer editable`);
       }
 
+      const wildcardValue = p.wildcardUsed ? 'yes' : 'no';
       const existing = findExisting.get(userId, p.gameId, currentleague);
 
       if (existing) {
-        updateScore.run(p.hometeamscore, p.awayteamscore, existing.id);
+        updateScore.run(p.hometeamscore, p.awayteamscore, wildcardValue, existing.id);
       } else {
-        insertScore.run(userId, currentleague, p.gameId, p.hometeamscore, p.awayteamscore);
+        insertScore.run(userId, currentleague, p.gameId, p.hometeamscore, p.awayteamscore, wildcardValue);
       }
     }
   });
@@ -926,8 +983,32 @@ app.listen(PORT, () => {
 app.listen(PORT, () => {
   console.log(`awpredictapp running on port ${PORT}`);
 
-  // Run the API sync when the server boots up
+  // Run the API sync when the server boots up, THEN recalculate league
+  // scores — always in that order, since scoring against a stale/missing
+  // games table would produce wrong points.
   fetchAndSync()
-    .then(() => console.log('Initial Football API sync finished.'))
-    .catch((err) => console.error('Initial sync failed:', err));
+    .then(() => {
+      console.log('Initial Football API sync finished.');
+      calculateScores();
+    })
+    .catch((err) => console.error('Initial sync/calculate failed:', err));
+});
+
+// ---------------------------------------------------------------------------
+// SCHEDULED SYNC — runs at midnight and midday every day, keeping fixtures
+// and league scores up to date without needing a server restart.
+// Cron format: minute hour day month weekday — "0 0,12 * * *" fires at
+// 00:00 and 12:00, every day, every month, any weekday.
+// ---------------------------------------------------------------------------
+cron.schedule('0 0,12 * * *', () => {
+  console.log('Scheduled sync starting...');
+
+  fetchAndSync()
+    .then(() => {
+      console.log('Scheduled Football API sync finished.');
+      calculateScores();
+    })
+    .catch((err) => console.error('Scheduled sync/calculate failed:', err));
+}, {
+  timezone: 'Europe/London'
 });

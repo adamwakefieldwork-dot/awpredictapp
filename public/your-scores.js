@@ -9,6 +9,7 @@
 let currentGameweek = null;
 let minGameweek = null;
 let maxGameweek = null;
+let wildcardEnabled = false; // set from the league's own settings each load
 
 // Grab references to the DOM elements we'll be updating repeatedly,
 // so we don't have to re-query them every time.
@@ -67,6 +68,7 @@ async function loadGameweek(gameweek) {
         currentGameweek = data.gameweek;
         minGameweek = data.minGameweek;
         maxGameweek = data.maxGameweek;
+        wildcardEnabled = data.wildcardEnabled;
 
         renderGameweekLabel();
         renderFixtures(data.games);
@@ -118,6 +120,24 @@ function renderFixtures(games) {
         const homeVal = game.predictedHomeScore ?? '';
         const awayVal = game.predictedAwayScore ?? '';
 
+        // Wildcard checkbox only renders at all if the LEAGUE has wildcards
+        // switched on. Even when it renders, it's disabled once the game
+        // has finished — same rule as the score inputs, since a wildcard
+        // choice shouldn't be changeable after the result is locked in.
+        const wildcardCheckbox = wildcardEnabled
+            ? `
+                <label class="wildcard-toggle" title="Use wildcard scoring for this game. Bonus points for a perfect, lose points otherwise">
+                    <input
+                        type="checkbox"
+                        class="wildcard-checkbox"
+                        ${game.wildcardUsed ? 'checked' : ''}
+                        ${isEditable ? '' : 'disabled'}
+                    >
+                    <span class="wildcard-star">★</span>
+                </label>
+            `
+            : '';
+
         html += `
             <div class="fixture-block">
                 <div class="date-label">${date}</div>
@@ -157,12 +177,37 @@ function renderFixtures(games) {
                         onerror="this.style.visibility='hidden'"
                     >
                 </div>
+
+                ${wildcardCheckbox}
             </div>
         `;
     }
 
     fixturesList.innerHTML = html;
 }
+
+// ---------------------------------------------------------------------
+// WILDCARD — enforce "only one per gameweek" the moment the user ticks
+// a box, rather than waiting until Save to reject it. Every fixture on
+// screen belongs to the SAME gameweek, so unchecking every other
+// wildcard checkbox on the page is correct and sufficient here.
+// Delegated on fixturesList (rather than attached per-checkbox) since
+// renderFixtures() replaces the whole innerHTML on every gameweek
+// change, which would silently drop any listeners bound directly to
+// the old checkboxes.
+// ---------------------------------------------------------------------
+fixturesList.addEventListener('change', (e) => {
+    if (!e.target.classList.contains('wildcard-checkbox')) return;
+
+    if (e.target.checked) {
+        const allWildcardBoxes = document.querySelectorAll('.wildcard-checkbox');
+        allWildcardBoxes.forEach((box) => {
+            if (box !== e.target) {
+                box.checked = false;
+            }
+        });
+    }
+});
 
 // ---------------------------------------------------------------------
 // GAMEWEEK ARROWS — just change the number and re-fetch/re-render.
@@ -185,16 +230,19 @@ nextBtn.addEventListener('click', () => {
 // array, and send them all to the server in a single request.
 // ---------------------------------------------------------------------
 saveBtn.addEventListener('click', async () => {
-    // .fixture-row elements only exist for games that are currently
-    // rendered (i.e. the gameweek on screen right now).
-    const rows = document.querySelectorAll('.fixture-row');
+    // .fixture-block wraps both the .fixture-row AND its wildcard
+    // checkbox (which lives as a sibling, not inside .fixture-row),
+    // so we iterate blocks and reach into each for its pieces.
+    const blocks = document.querySelectorAll('.fixture-block');
 
     const predictions = [];
 
-    for (const row of rows) {
+    for (const block of blocks) {
+        const row = block.querySelector('.fixture-row');
         const gameId = row.dataset.gameId; // reads data-game-id="..." we set above
         const homeInput = row.querySelector('.home-score-input');
         const awayInput = row.querySelector('.away-score-input');
+        const wildcardInput = block.querySelector('.wildcard-checkbox');
 
         // Skip rows that are disabled (game already played) — nothing
         // to save for those, and we don't want to accidentally overwrite
@@ -207,7 +255,10 @@ saveBtn.addEventListener('click', async () => {
         predictions.push({
             gameId: Number(gameId),
             hometeamscore: Number(homeInput.value),
-            awayteamscore: Number(awayInput.value)
+            awayteamscore: Number(awayInput.value),
+            // wildcardInput won't exist at all if the league doesn't have
+            // wildcards enabled, so default to false in that case.
+            wildcardUsed: wildcardInput ? wildcardInput.checked : false
         });
     }
 

@@ -188,3 +188,46 @@
 .save-message.error {
     color: red;
 }
+
+/* =========================================================
+   WILDCARD TOGGLE
+   Sits below each fixture row, centered, only rendered when
+   the league has wildcards switched on.
+   ========================================================= */
+.wildcard-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin-top: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+.wildcard-toggle input[type="checkbox"] {
+    cursor: pointer;
+    width: 16px;
+    height: 16px;
+}
+
+.wildcard-toggle input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+}
+
+.wildcard-star {
+    color: #e08a3e;
+    font-size: 1rem;
+}
+
+/* Dim the whole toggle (checkbox + star) once the game has finished
+   and the checkbox is disabled — visually matches the disabled score
+   inputs above it, rather than looking clickable when it isn't. */
+.wildcard-toggle:has(input:disabled) {
+    color: #bbb;
+    cursor: not-allowed;
+}
+
+.wildcard-toggle:has(input:disabled) .wildcard-star {
+    color: #ccc;
+}
