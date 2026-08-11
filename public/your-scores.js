@@ -106,27 +106,23 @@ function renderFixtures(games) {
     // not 10,000 — so there's no real performance concern here.)
     let html = '';
 
-    for (const game of games) {
-        // A game is only editable while it hasn't finished yet. Anything
-        // other than 'FINISHED' (SCHEDULED, TIMED, IN_PLAY, PAUSED,
-        // POSTPONED, etc.) is still open for predictions.
-        const isEditable = game.status !== 'FINISHED';
+        for (const game of games) {
+        // A game is editable only if it hasn't finished AND we're not within
+        // one hour of kickoff. Comparing raw Date objects (not localized
+        // strings) means this works correctly regardless of the viewer's own
+        // timezone — game.date is UTC, Date.now() is UTC under the hood, so
+        // the one-hour cutoff lines up with the actual kickoff instant either way.
+        const kickoff = new Date(game.date);
+        const oneHourBeforeKickoff = new Date(kickoff.getTime() - 60 * 60 * 1000);
+        const isEditable = game.status !== 'FINISHED' && Date.now() < oneHourBeforeKickoff.getTime();
 
-        // If the user already saved a prediction for this game earlier,
-        // the server includes it as predictedHomeScore/predictedAwayScore.
-        // We pre-fill the input with that value so it doesn't look blank
-        // and unsaved every time they revisit the page.
         const date = formatFixtureDate(game.date);
         const homeVal = game.predictedHomeScore ?? '';
         const awayVal = game.predictedAwayScore ?? '';
 
-        // Wildcard checkbox only renders at all if the LEAGUE has wildcards
-        // switched on. Even when it renders, it's disabled once the game
-        // has finished — same rule as the score inputs, since a wildcard
-        // choice shouldn't be changeable after the result is locked in.
         const wildcardCheckbox = wildcardEnabled
             ? `
-                <label class="wildcard-toggle" title="Use wildcard scoring for this game. Bonus points for a perfect, lose points otherwise">
+                <label class="wildcard-toggle" title="Use wildcard scoring for this game">
                     <input
                         type="checkbox"
                         class="wildcard-checkbox"
@@ -142,7 +138,7 @@ function renderFixtures(games) {
             <div class="fixture-block">
                 <div class="date-label">${date}</div>
 
-                <div class="fixture-row" data-game-id="${game.id}">
+                <div class="fixture-row" data-game-id="${game.id}" data-lock-at="${oneHourBeforeKickoff.getTime()}" data-status="${game.status}">
                     <img
                         class="team-crest"
                         src="${game.hometeamcrest ?? ''}"
@@ -185,6 +181,42 @@ function renderFixtures(games) {
 
     fixturesList.innerHTML = html;
 }
+
+// ---------------------------------------------------------------------
+// LIVE LOCKOUT CHECK — runs periodically so a fixture locks itself
+// (score inputs + wildcard checkbox) the moment it crosses the
+// one-hour-before-kickoff cutoff, even if the user never reloads the
+// page. This does NOT re-render anything — it only flips `disabled`
+// on existing inputs, so nothing the user has already typed is lost.
+// ---------------------------------------------------------------------
+function checkLockouts() {
+    const rows = document.querySelectorAll('.fixture-row');
+    const now = Date.now();
+
+    rows.forEach((row) => {
+        const lockAt = Number(row.dataset.lockAt);
+        const status = row.dataset.status;
+        const shouldBeLocked = status === 'FINISHED' || now >= lockAt;
+
+        if (!shouldBeLocked) return; // still editable, nothing to do
+
+        const homeInput = row.querySelector('.home-score-input');
+        const awayInput = row.querySelector('.away-score-input');
+
+        // Only touch things that aren't ALREADY disabled — avoids
+        // pointlessly reassigning the same value every tick.
+        if (!homeInput.disabled) homeInput.disabled = true;
+        if (!awayInput.disabled) awayInput.disabled = true;
+
+        const block = row.closest('.fixture-block');
+        const wildcardInput = block ? block.querySelector('.wildcard-checkbox') : null;
+        if (wildcardInput && !wildcardInput.disabled) wildcardInput.disabled = true;
+    });
+}
+
+// Check every 30 seconds — frequent enough that a fixture locks within
+// half a minute of crossing the cutoff, without hammering the DOM.
+setInterval(checkLockouts, 30000);
 
 // ---------------------------------------------------------------------
 // WILDCARD — enforce "only one per gameweek" the moment the user ticks

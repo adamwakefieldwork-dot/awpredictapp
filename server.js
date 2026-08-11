@@ -535,7 +535,7 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
     return res.status(400).json({ error: 'No predictions provided' });
   }
 
-  const getGame = db.prepare('SELECT status, matchday FROM games WHERE id = ?');
+  const getGame = db.prepare('SELECT status, matchday, utcdate FROM games WHERE id = ?');
   const findExisting = db.prepare(`
     SELECT id FROM playersscore WHERE userid = ? AND gameid = ? AND leagueid = ?
   `);
@@ -549,12 +549,17 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
   `);
 
-  // Counts how many wildcards this user already has active THIS
-  // gameweek, across games NOT included in the current submission.
-  // Needed because the incoming batch might only cover some of the
-  // gameweek's games — without this, a user could tick a wildcard on
-  // Game A, save, then separately tick one on Game B, save, and end up
-  // with two active wildcards in the same gameweek.
+  // Same rule as the frontend: locked once FINISHED, or once we're
+  // within one hour of kickoff — whichever comes first. This is the
+  // check that actually matters; the client-side version is just UX.
+  function isGameLocked(game) {
+    if (game.status === 'FINISHED') return true;
+
+    const kickoff = new Date(game.utcdate);
+    const oneHourBeforeKickoff = kickoff.getTime() - 60 * 60 * 1000;
+    return Date.now() >= oneHourBeforeKickoff;
+  }
+
   const countOtherWildcardsInMatchday = db.prepare(`
     SELECT COUNT(*) AS count
     FROM playersscore
@@ -567,9 +572,6 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
   `);
 
   const saveAll = db.transaction((predictionList) => {
-    // First pass: validate the ONE-WILDCARD-PER-GAMEWEEK rule across the
-    // whole batch before writing anything, so a bad submission doesn't
-    // save some rows and reject others halfway through.
     const wildcardCountByMatchday = {};
 
     for (const p of predictionList) {
@@ -582,8 +584,6 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
 
       wildcardCountByMatchday[game.matchday] = (wildcardCountByMatchday[game.matchday] || 0) + 1;
 
-      // Also check against wildcards already saved for OTHER games in
-      // this same gameweek that aren't part of this submission.
       const otherCount = countOtherWildcardsInMatchday.get(userId, currentleague, game.matchday, p.gameId).count;
       if (otherCount > 0) {
         throw new Error(`Only one wildcard can be used per gameweek (Gameweek ${game.matchday})`);
@@ -596,14 +596,13 @@ app.post('/api/scores', requireLoginApi, (req, res) => {
       }
     }
 
-    // Second pass: actually save, now that the batch is known to be valid.
     for (const p of predictionList) {
       const game = getGame.get(p.gameId);
 
       if (!game) {
         throw new Error(`Game ${p.gameId} does not exist`);
       }
-      if (game.status === 'FINISHED') {
+      if (isGameLocked(game)) {
         throw new Error(`Game ${p.gameId} is no longer editable`);
       }
 

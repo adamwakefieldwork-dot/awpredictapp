@@ -102,3 +102,34 @@
 .save-message.error {
     color: red;
 }
+
+/* =========================================================
+   CREATE A LEAGUE SECTION
+   Appended dynamically by league-settings.js when league
+   creation is enabled site-wide. Visually separated from the
+   settings form above it with a top border.
+   ========================================================= */
+.create-league-section {
+    margin-top: 32px;
+    padding-top: 24px;
+    border-top: 2px solid #e0e6ed;
+}
+
+.create-league-section h2 {
+    color: #1b4b66;
+    margin: 0 0 4px 0;
+}
+
+.create-league-section .subtitle {
+    color: #666;
+    font-size: 0.9rem;
+    margin: 0 0 20px 0;
+}
+
+.create-league-section select {
+    height: 38px;
+    padding: 0 10px;
+    border: 2px solid #1b4b66;
+    border-radius: 4px;
+    font-size: 1rem;
+}
