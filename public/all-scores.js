@@ -1,30 +1,40 @@
 // Fetches every game (across every gameweek) plus every league member's
-// predictions, then builds one long table grouped into gameweek sections.
-// Each cell's TEXT COLOUR reflects the outcome once a game is played:
-//   black  = game not played yet
-//   red    = wrong outcome entirely
-//   yellow = correct outcome, but not the exact score
-//   green  = perfect score
+// predictions, then renders it all as an AG Grid instead of a hand-built
+// HTML table. AG Grid's column pinning is what fixes the clipping issue —
+// Gameweek/Fixture/Result stay locked on the left while player columns
+// scroll independently, no matter how many members are in the league.
 
-const tableHead = document.querySelector('#all-scores-table thead tr');
-const tableBody = document.getElementById('all-scores-body');
+const statusEl = document.getElementById('all-scores-status');
+const gridContainer = document.getElementById('all-scores-grid');
+
+let gridApi = null;
 
 async function loadAllScores() {
-    tableBody.innerHTML = '<tr><td class="loading-msg">Loading...</td></tr>';
+    statusEl.textContent = 'Loading...';
+    statusEl.style.display = 'block';
+    gridContainer.style.display = 'none';
 
     try {
         const res = await fetch('/api/all-scores');
         const data = await res.json();
 
         if (!res.ok) {
-            tableBody.innerHTML = `<tr><td class="loading-msg">${data.error || 'Failed to load'}</td></tr>`;
+            statusEl.textContent = data.error || 'Failed to load';
             return;
         }
 
-        renderTable(data.games, data.users, data.predictions);
+        if (data.games.length === 0) {
+            statusEl.textContent = 'No fixtures yet';
+            return;
+        }
+
+        buildGrid(data.games, data.users, data.predictions);
+
+        statusEl.style.display = 'none';
+        gridContainer.style.display = 'block';
 
     } catch (err) {
-        tableBody.innerHTML = '<tr><td class="loading-msg">Network error — try again</td></tr>';
+        statusEl.textContent = 'Network error — try again';
     }
 }
 
@@ -57,68 +67,100 @@ function buildPredictionMap(predictions) {
     return map;
 }
 
-function renderTable(games, users, predictions) {
-    // "Result" sits as its own column, between the fixture and the
-    // first user's column — same header row, just one more <th>.
-    let headerHtml = '<th class="fixture-col-header">Fixture</th><th class="result-col-header">Result</th>';
-    for (const user of users) {
-        headerHtml += `<th>${user.username}</th>`;
-    }
-    tableHead.innerHTML = headerHtml;
-
-    if (games.length === 0) {
-        tableBody.innerHTML = '<tr><td class="loading-msg">No fixtures yet</td></tr>';
-        return;
-    }
-
+// ---------------------------------------------------------------------
+// Turns the raw games/users/predictions arrays into AG Grid's expected
+// shape: one column definition per fixed field + one per user, and one
+// row object per game.
+// ---------------------------------------------------------------------
+function buildGrid(games, users, predictions) {
     const predictionMap = buildPredictionMap(predictions);
-    const columnCount = users.length + 2; // +1 fixture, +1 result
 
-    let bodyHtml = '';
-    let lastGameweekSeen = null;
-
-    for (const game of games) {
-        if (game.gameweek !== lastGameweekSeen) {
-            bodyHtml += `
-                <tr class="gameweek-header-row">
-                    <td colspan="${columnCount}">Gameweek ${game.gameweek}</td>
-                </tr>
-            `;
-            lastGameweekSeen = game.gameweek;
+    // --- COLUMN DEFINITIONS ---
+    const columnDefs = [
+        {
+            field: 'gameweek',
+            headerName: 'GW',
+            pinned: 'left',
+            width: 70,
+            sort: 'asc',
+            sortIndex: 0,
+            filter: 'agNumberColumnFilter'
+        },
+        {
+            field: 'fixture',
+            headerName: 'Fixture',
+            pinned: 'left',
+            width: 240,
+            sortable: false,
+            filter: false,
+            cellRenderer: (params) => {
+                const f = params.value;
+                return `
+                    <div class="fixture-cell-line">
+                        <img class="team-crest-mini" src="${f.hometeamcrest ?? ''}" alt="${f.hometeamname} crest" onerror="this.style.visibility='hidden'">
+                        <span>${f.hometeamname} vs ${f.awayteamname}</span>
+                        <img class="team-crest-mini" src="${f.awayteamcrest ?? ''}" alt="${f.awayteamname} crest" onerror="this.style.visibility='hidden'">
+                    </div>
+                    <div class="fixture-cell-date">${f.dateLabel}</div>
+                `;
+            },
+            autoHeight: true
+        },
+        {
+            field: 'resultText',
+            headerName: 'Result',
+            pinned: 'left',
+            width: 90,
+            sortable: false,
+            filter: false,
+            cellClass: 'result-cell'
         }
+    ];
 
+    for (const user of users) {
+        columnDefs.push({
+            field: `user_${user.id}`,
+            headerName: user.username,
+            width: 120,
+            sortable: false,
+            filter: false,
+            cellRenderer: (params) => {
+                const p = params.value;
+                if (!p) return '<span class="no-prediction">—</span>';
+
+                return `
+                    ${p.scoreText}${p.wildcardBadge}
+                    ${p.pointsLine}
+                `;
+            },
+            cellClass: (params) => {
+                const p = params.value;
+                return p ? p.outcomeClass : 'no-prediction';
+            }
+        });
+    }
+
+    // --- ROW DATA ---
+    const rowData = games.map((game) => {
         const hasResult = game.hometeamscore !== null && game.awayteamscore !== null;
 
-        // Crests sit inline with each team name — small icons, not the
-        // score, which now lives in its own dedicated Result column.
-        const homeCrestImg = `<img class="team-crest-mini" src="${game.hometeamcrest ?? ''}" alt="${game.hometeamname} crest" onerror="this.style.visibility='hidden'">`;
-        const awayCrestImg = `<img class="team-crest-mini" src="${game.awayteamcrest ?? ''}" alt="${game.awayteamname} crest" onerror="this.style.visibility='hidden'">`;
-
-        // Fixture column now ALWAYS shows "vs" — the actual score, if
-        // there is one, appears separately in the Result column.
-        const fixtureLine = `${homeCrestImg} ${game.hometeamname} vs ${game.awayteamname} ${awayCrestImg}`;
-
-        const fixtureDate = formatFixtureDate(game.date);
-
-        // Result column — blank until the game has actually been played.
-        const resultText = hasResult
-            ? `${game.hometeamscore} - ${game.awayteamscore}`
-            : '';
-
-        bodyHtml += `
-            <tr>
-                <td class="fixture-col">
-                    <div class="fixture-line">${fixtureLine}</div>
-                    <div class="fixture-date">${fixtureDate}</div>
-                </td>
-                <td class="result-col">${resultText}</td>
-        `;
+        const row = {
+            gameweek: game.gameweek,
+            fixture: {
+                hometeamname: game.hometeamname,
+                awayteamname: game.awayteamname,
+                hometeamcrest: game.hometeamcrest,
+                awayteamcrest: game.awayteamcrest,
+                dateLabel: formatFixtureDate(game.date)
+            },
+            resultText: hasResult ? `${game.hometeamscore} - ${game.awayteamscore}` : ''
+        };
 
         for (const user of users) {
             const prediction = predictionMap[`${game.id}-${user.id}`];
 
             if (!prediction || prediction.hometeamscore === null || prediction.awayteamscore === null) {
-                bodyHtml += `<td class="prediction-cell no-prediction">—</td>`;
+                row[`user_${user.id}`] = null;
                 continue;
             }
 
@@ -130,34 +172,87 @@ function renderTable(games, users, predictions) {
                 ? `<span class="points-earned">${prediction.leaguescore}pts</span>`
                 : '';
 
-            // Outcome colour only applies once the game has a real
-            // result — otherwise the cell stays the default (black),
-            // since there's nothing to judge yet.
-            let cellClass = 'prediction-cell';
+            let outcomeClass = 'prediction-cell';
             if (hasResult) {
                 const isPerfect = prediction.hometeamscore === game.hometeamscore
                                 && prediction.awayteamscore === game.awayteamscore;
-                const predictedOutcome = Math.sign(prediction.hometeamscore - prediction.awayteamscore);
-                const actualOutcome = Math.sign(game.hometeamscore - game.awayteamscore);
-                const isCorrectOutcome = predictedOutcome === actualOutcome;
 
-                if (isPerfect) cellClass += ' outcome-perfect';
-                else if (isCorrectOutcome) cellClass += ' outcome-correct';
-                else cellClass += ' outcome-wrong';
+                if (prediction.wildcardused === 'yes') {
+                    // Wildcard predictions only have TWO outcomes, not three — an
+                    // exact match wins, anything else (even a correctly-guessed
+                    // result) loses. There's no "correct but not perfect" middle
+                    // tier for a wildcard, unlike a normal prediction.
+                    outcomeClass += isPerfect ? ' outcome-perfect' : ' outcome-wrong';
+                } else {
+                    const predictedOutcome = Math.sign(prediction.hometeamscore - prediction.awayteamscore);
+                    const actualOutcome = Math.sign(game.hometeamscore - game.awayteamscore);
+                    const isCorrectOutcome = predictedOutcome === actualOutcome;
+
+                    if (isPerfect) outcomeClass += ' outcome-perfect';
+                    else if (isCorrectOutcome) outcomeClass += ' outcome-correct';
+                    else outcomeClass += ' outcome-wrong';
+                }
             }
 
-            bodyHtml += `
-                <td class="${cellClass}">
-                    ${prediction.hometeamscore} - ${prediction.awayteamscore}${wildcardBadge}
-                    ${pointsLine}
-                </td>
-            `;
+            row[`user_${user.id}`] = {
+                scoreText: `${prediction.hometeamscore} - ${prediction.awayteamscore}`,
+                wildcardBadge,
+                pointsLine,
+                outcomeClass
+            };
         }
 
-        bodyHtml += '</tr>';
+        return row;
+    });
+
+    // ---------------------------------------------------------------------
+    // Builds a lookup of gameweek -> 0 or 1, alternating by the ORDER
+    // gameweeks appear in rowData (already sorted ascending), not by the
+    // gameweek number's own parity. E.g. if the actual gameweek numbers
+    // present are [1, 2, 4, 5] (3 is missing), this still alternates
+    // cleanly as white/grey/white/grey rather than grey/grey (since 2
+    // and 4 are both even).
+    // ---------------------------------------------------------------------
+    const distinctGameweeksInOrder = [...new Set(rowData.map((row) => row.gameweek))];
+    const gameweekBandLookup = {};
+    distinctGameweeksInOrder.forEach((gw, index) => {
+        gameweekBandLookup[gw] = index % 2;
+    });
+
+    // --- GRID SETUP ---
+    const gridOptions = {
+        columnDefs,
+        rowData,
+        rowHeight: 56,
+        headerHeight: 44,
+        defaultColDef: {
+            resizable: true
+        },
+        // Alternates row shading based on VISUAL POSITION among gameweeks,
+        // not the raw gameweek number's odd/even value. This guarantees
+        // strict alternation (white, grey, white, grey...) even if
+        // gameweek numbers have gaps.
+        getRowStyle: (params) => {
+            const isShaded = gameweekBandLookup[params.data.gameweek] === 1;
+            return isShaded ? { background: '#e8edf2' } : { background: '#ffffff' };
+        },
+        // Secondary sort by kickoff date within the same gameweek, so
+        // fixtures still appear in a sensible order without needing the
+        // old banner-row grouping.
+        onGridReady: (params) => {
+            params.api.applyColumnState({
+                state: [
+                    { colId: 'gameweek', sort: 'asc', sortIndex: 0 }
+                ]
+            });
+        }
+    };
+
+    if (gridApi) {
+        gridApi.destroy();
     }
 
-    tableBody.innerHTML = bodyHtml;
+    gridApi = agGrid.createGrid(gridContainer, gridOptions);
 }
 
 loadAllScores();

@@ -14,7 +14,12 @@ if (!API_KEY) {
     process.exit(1);
 }
 
-// Connect to SQLite database
+// Connect to SQLite database.
+// IMPORTANT: this connection is opened ONCE at module load time and reused
+// for every fetchAndSync() call (cron-scheduled or manual), because require()
+// caches this module. It must stay open for the life of the process — do NOT
+// call db.close() inside fetchAndSync(), or every run after the first will
+// fail silently (db.prepare() throws "database connection is not open").
 const db = new Database(DB_PATH);
 
 // Enable Foreign Key support
@@ -23,9 +28,16 @@ db.pragma('foreign_keys = ON');
 async function fetchAndSync() {
     console.log('Fetching data from Football-Data.org...');
 
+    // Guard against a hung network request blocking the scheduler forever.
+    // Without this, a stalled fetch() never resolves or rejects, so the
+    // scheduled sync silently never completes and calculateScores() never runs.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 20000); // 20s timeout
+
     try {
         const response = await fetch(API_URL, {
-            headers: { 'X-Auth-Token': API_KEY }
+            headers: { 'X-Auth-Token': API_KEY },
+            signal: controller.signal
         });
 
         if (!response.ok) {
@@ -176,10 +188,27 @@ async function fetchAndSync() {
 
     } catch (error) {
         console.error('Error syncing match data:', error);
+        // Re-throw so the caller (cron scheduler in server.js) knows this run
+        // failed, rather than swallowing it and looking like success.
+        throw error;
     } finally {
-        db.close();
+        clearTimeout(timeout);
+        // NOTE: db.close() intentionally removed here.
+        // `db` is a shared, module-level connection reused on every scheduled
+        // run — closing it after the first run breaks every run after that.
+        // The connection is closed once, on process shutdown, below instead.
     }
 }
+
+// Close the shared connection cleanly when the process actually exits
+// (e.g. PM2 stop/restart, server shutdown) — not after every sync.
+process.on('exit', () => {
+    try {
+        db.close();
+    } catch (err) {
+        // ignore — already closed or never opened
+    }
+});
 
 // Only auto-run when this file is executed directly (e.g. `node import-football.js`).
 // When it's require()'d from server.js instead, this block is skipped — server.js

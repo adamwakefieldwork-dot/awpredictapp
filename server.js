@@ -698,15 +698,6 @@ app.get('/api/dashboard', requireLoginApi, (req, res) => {
     return res.status(400).json({ error: 'No league selected' });
   }
 
-  // LEFT JOINs (not JOIN) are deliberate here — a league member who
-  // hasn't predicted anything yet should still appear in the table,
-  // with zeros, rather than being silently dropped from the leaderboard.
-  //
-  // perfectcount / correctcount are derived by comparing the prediction
-  // directly against the game's actual result — NOT by inspecting
-  // leaguescore's value, since that number depends on each league's own
-  // configurable point settings and can't be trusted to identify WHICH
-  // tier a prediction fell into.
   const leaderboard = db.prepare(`
     SELECT
       users.id,
@@ -737,6 +728,7 @@ app.get('/api/dashboard', requireLoginApi, (req, res) => {
       COUNT(CASE
         WHEN games.scorefulltimehome IS NOT NULL
          AND playersscore.hometeamscore IS NOT NULL
+         AND (playersscore.wildcardused IS NULL OR playersscore.wildcardused != 'yes')
          AND NOT (
              games.scorefulltimehome = playersscore.hometeamscore
              AND games.scorefulltimeaway = playersscore.awayteamscore
@@ -747,7 +739,21 @@ app.get('/api/dashboard', requireLoginApi, (req, res) => {
              OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.scorefulltimehome = games.scorefulltimeaway)
          )
         THEN 1
-      END) AS correctcount
+      END) AS correctcount,
+
+      COUNT(CASE
+        WHEN playersscore.wildcardused = 'yes'
+         AND playersscore.hometeamscore IS NOT NULL
+         AND playersscore.awayteamscore IS NOT NULL
+        THEN 1
+      END) AS wildcardsused,
+
+      COUNT(CASE
+        WHEN playersscore.wildcardused = 'yes'
+         AND games.scorefulltimehome = playersscore.hometeamscore
+         AND games.scorefulltimeaway = playersscore.awayteamscore
+        THEN 1
+      END) AS wildcardscorrect
 
     FROM leagueuser
     JOIN users ON users.id = leagueuser.userid
@@ -999,7 +1005,7 @@ app.listen(PORT, () => {
 // Cron format: minute hour day month weekday — "0 0,12 * * *" fires at
 // 00:00 and 12:00, every day, every month, any weekday.
 // ---------------------------------------------------------------------------
-cron.schedule('0 0,12 * * *', () => {
+cron.schedule('0 0,6,12 * * *', () => {
   console.log('Scheduled sync starting...');
 
   fetchAndSync()

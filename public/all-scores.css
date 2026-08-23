@@ -82,7 +82,7 @@
     font-size: 0.75rem;
     color: #888;
     text-align: left;
-}
+}w
 
 /* =========================================================
    PREDICTION CELLS — colour is the primary signal here.
@@ -142,4 +142,118 @@
     font-weight: bold;
     color: #1b4b66;
     min-width: 80px;
+}
+
+/* =========================================================
+   GRID CONTAINER
+   AG Grid needs an explicit height to know how much vertical
+   space it has for its own internal scrolling.
+   ========================================================= */
+.all-scores-grid {
+    height: 75vh;
+    max-width: 100%;
+    margin: 20px auto 32px auto;
+    border: 2px solid #4a6fa5;
+    border-radius: 12px;
+    overflow: hidden; /* keeps the grid's contents inside the rounded corners */
+}
+
+/* =========================================================
+   AG GRID THEME OVERRIDES (Quartz theme, CSS custom properties)
+   Brings the grid's colours in line with the rest of the site
+   rather than using AG Grid's default palette.
+   ========================================================= */
+.ag-theme-quartz {
+    --ag-header-background-color: #1b4b66;
+    --ag-header-foreground-color: white;
+    --ag-header-cell-hover-background-color: #123a50;
+    --ag-font-size: 14px;
+    --ag-row-hover-color: #f0f4f8;
+    --ag-border-color: #eee;
+}
+
+/* =========================================================
+   FIXTURE CELL — crest + team names on one line, date on the
+   line below. autoHeight on the column def lets the row grow
+   to fit both lines without clipping.
+   ========================================================= */
+.fixture-cell-line {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+    padding-top: 6px;
+}
+
+.fixture-cell-date {
+    font-size: 0.75rem;
+    color: #888;
+    text-align: left;
+    padding-bottom: 6px;
+}
+
+.team-crest-mini {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+    vertical-align: middle;
+}
+
+/* =========================================================
+   RESULT COLUMN
+   ========================================================= */
+.result-cell {
+    font-weight: bold;
+    color: #1b4b66;
+    text-align: center;
+}
+
+/* =========================================================
+   PREDICTION CELLS — colour is the primary signal here.
+   Default (.prediction-cell with no outcome class) = black =
+   not played yet. The three outcome classes override that
+   once a game has a real result.
+   ========================================================= */
+.prediction-cell {
+    font-weight: bold;
+    color: #111;
+    text-align: center;
+}
+
+.no-prediction {
+    color: #bbb;
+    font-weight: normal;
+    text-align: center;
+}
+
+.prediction-cell.outcome-wrong {
+    color: #c62828;
+}
+
+.prediction-cell.outcome-correct {
+    color: #b8860b;
+}
+
+.prediction-cell.outcome-perfect {
+    color: #2e7d32;
+}
+
+.points-earned {
+    display: block;
+    font-size: 0.75rem;
+    font-weight: normal;
+    color: inherit;
+}
+
+.wildcard-badge {
+    display: inline-block;
+    margin-left: 4px;
+    color: #e08a3e;
+    font-size: 0.9rem;
+}
+
+.loading-msg {
+    text-align: center;
+    color: #666;
+    padding: 20px;
 }

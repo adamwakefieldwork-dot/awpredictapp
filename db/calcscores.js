@@ -24,13 +24,13 @@ function calculateScores() {
                          OR games.scorefulltimeaway IS NULL
                     THEN NULL
 
+                    -- Wildcard is all-or-nothing: only an EXACT scoreline match
+                    -- counts as a win. Getting the correct outcome (e.g. picking
+                    -- the right team to win) but the wrong scoreline still loses.
                     WHEN playersscore.wildcardused = 'yes' THEN
                         CASE
-                            WHEN (
-                                (playersscore.hometeamscore > playersscore.awayteamscore AND games.scorefulltimehome > games.scorefulltimeaway)
-                                OR (playersscore.hometeamscore < playersscore.awayteamscore AND games.scorefulltimehome < games.scorefulltimeaway)
-                                OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.scorefulltimehome = games.scorefulltimeaway)
-                            )
+                            WHEN playersscore.hometeamscore = games.scorefulltimehome
+                                 AND playersscore.awayteamscore = games.scorefulltimeaway
                             THEN leagues.wildcardwinscore
                             ELSE leagues.wildcardlosescore
                         END

@@ -65,3 +65,42 @@
     color: #666;
     padding: 20px;
 }
+
+/* =========================================================
+   GRID CONTAINER
+   domLayout: 'autoHeight' in dashboard.js means the grid sizes
+   itself to its row count rather than needing a fixed pixel
+   height like all-scores.js does — appropriate here since a
+   leaderboard is always a short, fully-visible list.
+   ========================================================= */
+.dashboard-grid {
+    max-width: 1200px;
+    margin: 20px auto 32px auto;
+    border: 2px solid #4a6fa5;
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.ag-theme-quartz {
+    --ag-header-background-color: #1b4b66;
+    --ag-header-foreground-color: white;
+    --ag-header-cell-hover-background-color: #123a50;
+    --ag-font-size: 14px;
+    --ag-border-color: #eee;
+}
+
+.rank-col,
+.points-col {
+    font-weight: bold;
+    color: #1b4b66;
+}
+
+.player-col {
+    font-weight: bold;
+}
+
+.loading-msg {
+    text-align: center;
+    color: #666;
+    padding: 20px;
+}

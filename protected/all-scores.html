@@ -6,6 +6,13 @@
     <title>All Scores</title>
     <link rel="stylesheet" href="/style.css">
     <link rel="stylesheet" href="/all-scores.css">
+
+    <!-- AG Grid Community (free tier) — pinned columns are what solve
+         the clipping problem: Gameweek/Fixture/Result stay fixed on the
+         left while player columns scroll independently underneath them. -->
+    <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/dist/ag-grid-community.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/styles/ag-grid.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/styles/ag-theme-quartz.css">
 </head>
 <body>
 
@@ -29,24 +36,12 @@
 
 <div class="content">
 
-    <!-- No gameweek nav anymore — every gameweek renders at once,
-         grouped into sections by all-scores.js -->
+    <div id="all-scores-status" class="loading-msg">Loading...</div>
 
-    <div class="table-scroll-wrapper">
-        <table class="all-scores-table" id="all-scores-table">
-            <thead>
-                <tr>
-                    <th class="fixture-col-header">Fixture</th>
-                    <!-- one <th> per user gets inserted here by JS -->
-                </tr>
-            </thead>
-            <tbody id="all-scores-body">
-                <tr>
-                    <td class="loading-msg">Loading...</td>
-                </tr>
-            </tbody>
-        </table>
-    </div>
+    <!-- AG Grid mounts into this div. Fixed height + the theme class are
+         both required — AG Grid needs an explicit container height to
+         know how much space it has for its own internal scrolling. -->
+    <div id="all-scores-grid" class="ag-theme-quartz all-scores-grid"></div>
 
 </div>
 
