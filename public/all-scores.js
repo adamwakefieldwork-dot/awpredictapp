@@ -3,11 +3,24 @@
 // HTML table. AG Grid's column pinning is what fixes the clipping issue —
 // Gameweek/Fixture/Result stay locked on the left while player columns
 // scroll independently, no matter how many members are in the league.
+//
+// By default the grid shows only LAST gameweek, THIS gameweek and NEXT
+// gameweek. A toggle button switches to the full season and back.
 
 const statusEl = document.getElementById('all-scores-status');
 const gridContainer = document.getElementById('all-scores-grid');
+const toggleBtn = document.getElementById('toggle-range');
+const rangeLabelEl = document.getElementById('range-label');
 
 let gridApi = null;
+
+// Everything the API returned, kept in memory so toggling between
+// "recent" and "full season" doesn't need another network request.
+let allData = null;
+
+// true  = show every gameweek
+// false = show only last / this / next gameweek (the default)
+let showFullSeason = false;
 
 async function loadAllScores() {
     statusEl.textContent = 'Loading...';
@@ -28,7 +41,8 @@ async function loadAllScores() {
             return;
         }
 
-        buildGrid(data.games, data.users, data.predictions);
+        allData = data;
+        renderGrid();
 
         statusEl.style.display = 'none';
         gridContainer.style.display = 'block';
@@ -36,6 +50,79 @@ async function loadAllScores() {
     } catch (err) {
         statusEl.textContent = 'Network error — try again';
     }
+}
+
+// ---------------------------------------------------------------------
+// CURRENT GAMEWEEK — the gameweek of the next game that hasn't been
+// played yet. Postponed/cancelled games are ignored, otherwise one
+// postponed game from months ago would be the "earliest unfinished"
+// game and pin "this week" to the wrong gameweek.
+// If nothing is left to play (season over), falls back to the last
+// gameweek.
+// ---------------------------------------------------------------------
+function getCurrentGameweek(games) {
+    const upcoming = games
+        .filter((g) => g.status !== 'FINISHED'
+                    && g.status !== 'POSTPONED'
+                    && g.status !== 'CANCELLED')
+        .sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    if (upcoming.length > 0) {
+        return upcoming[0].gameweek;
+    }
+
+    return Math.max(...games.map((g) => g.gameweek));
+}
+
+// Keeps only current - 1, current and current + 1.
+function filterToRecentGameweeks(games, currentGameweek) {
+    return games.filter(
+        (g) => g.gameweek >= currentGameweek - 1 && g.gameweek <= currentGameweek + 1
+    );
+}
+
+// ---------------------------------------------------------------------
+// Decides which games to show, updates the button/label text, then
+// builds the grid.
+// ---------------------------------------------------------------------
+function renderGrid() {
+    if (!allData) return;
+
+    const currentGameweek = getCurrentGameweek(allData.games);
+
+    const gamesToShow = showFullSeason
+        ? allData.games
+        : filterToRecentGameweeks(allData.games, currentGameweek);
+
+    updateControls(gamesToShow, currentGameweek);
+
+    buildGrid(gamesToShow, allData.users, allData.predictions, currentGameweek);
+}
+
+function updateControls(gamesToShow, currentGameweek) {
+    if (toggleBtn) {
+        toggleBtn.textContent = showFullSeason ? 'Show recent weeks' : 'Show full season';
+    }
+
+    if (rangeLabelEl) {
+        if (showFullSeason) {
+            rangeLabelEl.textContent = `Showing full season (current gameweek: ${currentGameweek})`;
+        } else {
+            const weeks = [...new Set(gamesToShow.map((g) => g.gameweek))].sort((a, b) => a - b);
+            const first = weeks[0];
+            const last = weeks[weeks.length - 1];
+            rangeLabelEl.textContent = first === last
+                ? `Showing gameweek ${first}`
+                : `Showing gameweeks ${first}–${last}`;
+        }
+    }
+}
+
+if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => {
+        showFullSeason = !showFullSeason;
+        renderGrid();
+    });
 }
 
 // ---------------------------------------------------------------------
@@ -72,7 +159,7 @@ function buildPredictionMap(predictions) {
 // shape: one column definition per fixed field + one per user, and one
 // row object per game.
 // ---------------------------------------------------------------------
-function buildGrid(games, users, predictions) {
+function buildGrid(games, users, predictions, currentGameweek) {
     const predictionMap = buildPredictionMap(predictions);
 
     // --- COLUMN DEFINITIONS ---
@@ -245,6 +332,23 @@ function buildGrid(games, users, predictions) {
                     { colId: 'gameweek', sort: 'asc', sortIndex: 0 }
                 ]
             });
+        },
+        // When showing the FULL season, jump straight to the current
+        // gameweek instead of starting at gameweek 1. (In the default
+        // 3-week view there's nothing to scroll to.)
+        onFirstDataRendered: (params) => {
+            if (!showFullSeason) return;
+
+            let targetIndex = null;
+            params.api.forEachNode((node) => {
+                if (targetIndex === null && node.data.gameweek === currentGameweek) {
+                    targetIndex = node.rowIndex;
+                }
+            });
+
+            if (targetIndex !== null) {
+                params.api.ensureIndexVisible(targetIndex, 'top');
+            }
         }
     };
 

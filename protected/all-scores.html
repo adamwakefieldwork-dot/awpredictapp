@@ -13,6 +13,24 @@
     <script src="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/dist/ag-grid-community.min.js"></script>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/styles/ag-grid.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ag-grid-community@32.2.0/styles/ag-theme-quartz.css">
+
+    <!-- Styling for the new range label + toggle button. Kept here so this
+         file works on its own; you can move these rules into
+         all-scores.css if you prefer. -->
+    <style>
+        .all-scores-controls {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .range-label {
+            font-weight: 600;
+            color: #323232;
+        }
+    </style>
 </head>
 <body>
 
@@ -35,6 +53,14 @@
 </header>
 
 <div class="content">
+
+    <!-- Range controls: label shows which gameweeks are visible, button
+         switches between "last / this / next gameweek" and the full season.
+         Both IDs are used by all-scores.js. -->
+    <div class="all-scores-controls">
+        <span id="range-label" class="range-label"></span>
+        <button id="toggle-range" class="btn">Show full season</button>
+    </div>
 
     <div id="all-scores-status" class="loading-msg">Loading...</div>
 

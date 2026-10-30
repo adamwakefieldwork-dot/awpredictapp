@@ -99,6 +99,9 @@ async function fetchAndSync() {
                 scorehalftimehome, scorehalftimeaway
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(id) DO UPDATE SET
+                utcdate = excluded.utcdate,
+                hometeamid = excluded.hometeamid,
+                awayteamid = excluded.awayteamid,
                 status = excluded.status,
                 matchday = excluded.matchday,
                 stage = excluded.stage,

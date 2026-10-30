@@ -1,3 +1,6 @@
+// Load environment variables FIRST, before anything below reads process.env
+require('dotenv').config();
+
 const express = require('express');
 const path = require('path');
 const session = require('express-session');
@@ -11,8 +14,6 @@ const { calculateScores } = require('./db/calcscores');
 
 const app = express();
 const PORT = 3000;
-
-require('dotenv').config();
 
 const ALLOW_LEAGUE_CREATION = process.env.ALLOW_LEAGUE_CREATION !== 'false';
 
@@ -390,7 +391,7 @@ app.get('/api/competitions/:competitionId/seasons', requireLoginApi, (req, res) 
 // league row, adds the creator as owner in leagueuser, and sets it as
 // currentleague for this session so the next page load lands them in it.
 app.post('/api/create-league', requireLoginApi, (req, res) => {
-    if (!ALLOW_LEAGUE_CREATION) {
+  if (!ALLOW_LEAGUE_CREATION) {
     return res.status(403).json({ error: 'League creation is currently disabled' });
   }
   const userId = req.session.userId;
@@ -442,11 +443,10 @@ app.post('/api/create-league', requireLoginApi, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// HIDING FLAG API— powers the "Your Scores" page
+// APP CONFIG API — lets the frontend know which features are currently
+// switched on, without needing a page reload to change.
 // ---------------------------------------------------------------------------
 
-// GET /api/app-config — lets the frontend know which features are
-// currently switched on, without needing a page reload to change.
 app.get('/api/app-config', (req, res) => {
   res.json({ allowLeagueCreation: ALLOW_LEAGUE_CREATION });
 });
@@ -674,7 +674,7 @@ app.get('/api/all-scores', requireLoginApi, (req, res) => {
   // Every prediction in this league, across every game — no gameid
   // filtering needed now, since we want the full picture regardless
   // of gameweek. Includes leaguescore, which is what shows the points
-  // earned per prediction (NULL until recalculate-league-scores has run
+  // earned per prediction (NULL until the score calculation has run
   // for that game).
   const predictions = db.prepare(`
     SELECT userid, gameid, hometeamscore, awayteamscore, wildcardused, leaguescore
@@ -873,9 +873,14 @@ app.post('/api/leaguesettings', requireLoginApi, (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
-// GAME RESULTS API — recalculates every player's leaguescore whenever
-// the league's own settings have changed more recently than the scores
-// were last touched.
+// RECALCULATE LEAGUE SCORES — recalculates every player's leaguescore
+// whenever the league's own settings have changed more recently than the
+// scores were last touched.
+//
+// NOTE: the scoring rules below MUST match calcscores.js:
+//   - Not-yet-played games stay NULL (picked up later by calculateScores)
+//   - Wildcard is all-or-nothing: EXACT scoreline wins, anything else loses
+//   - Normal: exact = perfectscore, correct outcome = winscore, else losescore
 // ---------------------------------------------------------------------------
 
 app.post('/api/recalculate-league-scores', requireLoginApi, (req, res) => {
@@ -912,19 +917,23 @@ app.post('/api/recalculate-league-scores', requireLoginApi, (req, res) => {
         SELECT
             CASE
                 WHEN playersscore.hometeamscore IS NULL OR playersscore.awayteamscore IS NULL THEN 0
+
+                -- Game not played yet: leave NULL so calculateScores() scores it later
+                WHEN games.scorefulltimehome IS NULL OR games.scorefulltimeaway IS NULL THEN NULL
+
+                -- Wildcard is all-or-nothing: exact scoreline only
                 WHEN playersscore.wildcardused = 'yes' THEN
                     CASE
-                        WHEN (
-                            (playersscore.hometeamscore > playersscore.awayteamscore AND games.scorefulltimehome > games.scorefulltimeaway)
-                            OR (playersscore.hometeamscore < playersscore.awayteamscore AND games.scorefulltimehome < games.scorefulltimeaway)
-                            OR (playersscore.hometeamscore = playersscore.awayteamscore AND games.scorefulltimehome = games.scorefulltimeaway)
-                        )
+                        WHEN playersscore.hometeamscore = games.scorefulltimehome
+                             AND playersscore.awayteamscore = games.scorefulltimeaway
                         THEN leagues.wildcardwinscore
                         ELSE leagues.wildcardlosescore
                     END
+
                 ELSE
                     CASE
-                        WHEN playersscore.hometeamscore = games.scorefulltimehome AND playersscore.awayteamscore = games.scorefulltimeaway
+                        WHEN playersscore.hometeamscore = games.scorefulltimehome
+                             AND playersscore.awayteamscore = games.scorefulltimeaway
                         THEN leagues.perfectscore
                         WHEN (
                             (playersscore.hometeamscore > playersscore.awayteamscore AND games.scorefulltimehome > games.scorefulltimeaway)
@@ -977,12 +986,10 @@ app.get('/app/:page', requireLogin, requireLeague, (req, res) => {
 
 app.use(express.static(path.join(__dirname, 'public'), { extensions: ['html'] }));
 
-app.listen(PORT, () => {
-  console.log(`awpredictapp running on port ${PORT}`);
-});
-
 // ---------------------------------------------------------------------------
-// IMPORTING UPDATED SCORES
+// START SERVER + INITIAL SYNC
+// (single app.listen — there used to be two, which tries to bind the same
+// port twice)
 // ---------------------------------------------------------------------------
 
 app.listen(PORT, () => {
@@ -1000,10 +1007,10 @@ app.listen(PORT, () => {
 });
 
 // ---------------------------------------------------------------------------
-// SCHEDULED SYNC — runs at midnight and midday every day, keeping fixtures
-// and league scores up to date without needing a server restart.
-// Cron format: minute hour day month weekday — "0 0,12 * * *" fires at
-// 00:00 and 12:00, every day, every month, any weekday.
+// SCHEDULED SYNC — runs at 00:00, 06:00 and 12:00 London time every day,
+// keeping fixtures, kickoff times and league scores up to date without
+// needing a server restart.
+// Cron format: minute hour day month weekday.
 // ---------------------------------------------------------------------------
 cron.schedule('0 0,6,12 * * *', () => {
   console.log('Scheduled sync starting...');

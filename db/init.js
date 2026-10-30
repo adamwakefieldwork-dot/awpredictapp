@@ -167,6 +167,17 @@ db.exec(`
   )
 `);
 
+db.exec(`
+CREATE TABLE IF NOT EXISTS usernotices (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  userid INTEGER NOT NULL,
+  title TEXT NOT NULL,
+  message TEXT NOT NULL,
+  createdatetime TEXT DEFAULT CURRENT_TIMESTAMP,
+  dismissedatetime TEXT,
+  FOREIGN KEY (userid) REFERENCES users(id)
+)
+`);
 
 console.log('database opened successfully');
 
